@@ -120,11 +120,34 @@ func New(s *auth.Session) (*Client, error) {
 // `*cliutil.RateLimitError` when retries are exhausted. Empty-on-throttle is
 // a recipe for silent data corruption: callers MUST surface this error
 // rather than treating it as "no data exists".
+//
+// Bot-detection coverage: the unified HTTP entry point also fast-fails when
+// a disk-persisted cooldown is active and records a new cooldown when the
+// upstream returns 403. SSR fetches (FetchInitialState) and GraphQL calls
+// (gqlCall) both flow through this path, so cooldown coverage is uniform
+// across read paths.
 func (c *Client) do429Aware(req *http.Request) (*http.Response, error) {
+	if active := loadActiveCooldown(); active != nil {
+		return nil, active
+	}
 	c.limiter.Wait()
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return nil, err
+	}
+	if resp.StatusCode == 403 {
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		_ = body
+		bde, sErr := setCooldown(fmt.Sprintf("403 from %s (Akamai anti-bot)", req.URL.Path))
+		if sErr != nil {
+			return nil, &BotDetectionError{
+				URL: req.URL.String(), Status: 403, Streak: 1,
+				Until:  time.Now().Add(5 * time.Minute),
+				Reason: fmt.Sprintf("403 from %s; cooldown not persisted: %v", req.URL.Path, sErr),
+			}
+		}
+		return nil, bde
 	}
 	if resp.StatusCode != http.StatusTooManyRequests {
 		c.limiter.OnSuccess()
@@ -175,8 +198,14 @@ func (c *Client) LoggedIn() bool {
 // Bootstrap fetches the OpenTable homepage to extract `__CSRF_TOKEN__`.
 // Idempotent — only refreshes when the cached token is older than csrfTTL.
 // Concurrent callers are deduplicated via singleflight so a single in-flight
-// fetch satisfies all waiters; the redundant-fetch race that the previous
-// "check-release-fetch-relock" pattern allowed is now closed.
+// fetch satisfies all waiters.
+//
+// Bot-detection cooldown: before any HTTP fetch, this method checks the
+// disk-persisted cooldown (set on prior 403s) and fast-fails with a typed
+// `*BotDetectionError` if the cooldown is still active. On a 403 from the
+// home page, it writes a new cooldown with exponential backoff per
+// consecutive 403, so the next CLI invocation doesn't waste a 30s timeout
+// before failing. A successful 200 clears the cooldown.
 func (c *Client) Bootstrap(ctx context.Context) error {
 	c.mu.Lock()
 	fresh := c.csrfToken != "" && time.Since(c.csrfFetchedAt) < c.csrfTTL
@@ -184,16 +213,22 @@ func (c *Client) Bootstrap(ctx context.Context) error {
 	if fresh {
 		return nil
 	}
+	// Fast-fail if a prior 403 cooldown is still active.
+	if active := loadActiveCooldown(); active != nil {
+		return active
+	}
 	_, err, _ := c.bootstrapSF.Do("csrf", func() (any, error) {
-		// Double-check inside the singleflight closure: another caller
-		// may have completed a bootstrap between our outer check and
-		// the singleflight grant. Avoid a wasted fetch if so.
 		c.mu.Lock()
 		if c.csrfToken != "" && time.Since(c.csrfFetchedAt) < c.csrfTTL {
 			c.mu.Unlock()
 			return nil, nil
 		}
 		c.mu.Unlock()
+		// Re-check cooldown inside the singleflight closure — another
+		// caller may have updated it between our outer check and here.
+		if active := loadActiveCooldown(); active != nil {
+			return nil, active
+		}
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, Origin+"/", nil)
 		if err != nil {
 			return nil, fmt.Errorf("building bootstrap request: %w", err)
@@ -204,6 +239,22 @@ func (c *Client) Bootstrap(ctx context.Context) error {
 			return nil, fmt.Errorf("fetching opentable.com: %w", err)
 		}
 		defer resp.Body.Close()
+		if resp.StatusCode == 403 {
+			// Persistent anti-bot block — record cooldown and surface
+			// a typed error so callers render the right remediation.
+			bde, sErr := setCooldown("home-page bootstrap returned 403 (Akamai anti-bot)")
+			if sErr != nil {
+				// Best effort — even if persistence failed, return a
+				// transient bot-detection error so the user sees the
+				// right error class.
+				return nil, &BotDetectionError{
+					URL: Origin + "/", Status: 403, Streak: 1,
+					Until:  time.Now().Add(5 * time.Minute),
+					Reason: "home-page bootstrap returned 403 (Akamai anti-bot); cooldown not persisted: " + sErr.Error(),
+				}
+			}
+			return nil, bde
+		}
 		if resp.StatusCode >= 400 {
 			return nil, fmt.Errorf("opentable.com returned HTTP %d during bootstrap", resp.StatusCode)
 		}
@@ -215,6 +266,9 @@ func (c *Client) Bootstrap(ctx context.Context) error {
 		if token == "" {
 			return nil, errors.New("could not extract __CSRF_TOKEN__ from opentable.com homepage; site structure may have changed")
 		}
+		// 200 clears any previous cooldown so the next 403 starts a
+		// fresh streak rather than escalating from stale state.
+		clearCooldown()
 		c.mu.Lock()
 		c.csrfToken = token
 		c.csrfFetchedAt = time.Now()

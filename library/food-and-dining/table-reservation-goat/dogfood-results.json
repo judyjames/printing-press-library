@@ -76,7 +76,7 @@
     "exempted_via_client_directive": 3
   },
   "source_client_check": {
-    "checked": 6,
+    "checked": 7,
     "findings": [
       {
         "package": "source/opentable",
