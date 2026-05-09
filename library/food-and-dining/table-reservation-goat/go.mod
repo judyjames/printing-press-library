@@ -15,6 +15,7 @@ require (
 	github.com/enetx/surf v1.0.199
 	github.com/mark3labs/mcp-go v0.47.0
 	github.com/spf13/pflag v1.0.10
+	golang.org/x/sync v0.20.0
 )
 
 require (

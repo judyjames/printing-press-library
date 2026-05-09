@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"time"
 
 	"github.com/mvanhorn/printing-press-library/library/food-and-dining/table-reservation-goat/internal/cliutil"
 	"github.com/mvanhorn/printing-press-library/library/food-and-dining/table-reservation-goat/internal/source/jseval"
@@ -151,7 +152,11 @@ func (c *Client) SearchRestaurants(ctx context.Context, opts SearchOptions) ([]m
 		opts.Covers = 2
 	}
 	if opts.DateTime == "" {
-		opts.DateTime = "2026-05-15T19:00:00"
+		// Default to one week from today at 19:00 local — far enough out
+		// that most venues have availability, close enough that the
+		// query hits the user's likely intent. Computed at call time so
+		// the default never goes stale.
+		opts.DateTime = time.Now().AddDate(0, 0, 7).Format("2006-01-02") + "T19:00:00"
 	}
 	q := fmt.Sprintf("/s?dateTime=%s&covers=%d&latitude=%.4f&longitude=%.4f",
 		opts.DateTime, opts.Covers, opts.Latitude, opts.Longitude)

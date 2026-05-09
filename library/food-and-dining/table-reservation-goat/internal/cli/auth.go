@@ -15,14 +15,14 @@ import (
 // There is no API key flow; both services use cookie-session auth and the user
 // is expected to have logged in to opentable.com and exploretock.com in Chrome.
 func newAuthCmd(flags *rootFlags) *cobra.Command {
+	// No mcp:read-only on the parent — this is a command group whose
+	// children include both reads (`status`) and writes (`login`,
+	// `logout`). Per-subcommand annotations carry the right hint.
 	cmd := &cobra.Command{
 		Use:   "auth",
 		Short: "Manage browser cookie sessions for OpenTable and Tock",
 		Long: "Import session cookies from your local Chrome profile so authenticated " +
 			"commands (book, my-reservations, wishlist) work without an API key.",
-		Annotations: map[string]string{
-			"mcp:read-only": "true",
-		},
 	}
 	cmd.AddCommand(newAuthLoginCmd(flags))
 	cmd.AddCommand(newAuthStatusCmd(flags))
@@ -32,6 +32,11 @@ func newAuthCmd(flags *rootFlags) *cobra.Command {
 
 func newAuthLoginCmd(flags *rootFlags) *cobra.Command {
 	var fromChrome bool
+	// `auth login --chrome` writes session cookies to disk via
+	// `session.Save()`. Do NOT mark mcp:read-only — an MCP host that
+	// honors the hint would skip the call in side-effect-prohibited
+	// contexts and the user-consented session import would silently
+	// not happen.
 	cmd := &cobra.Command{
 		Use:   "login",
 		Short: "Import session cookies from your local Chrome profile",
@@ -40,9 +45,6 @@ func newAuthLoginCmd(flags *rootFlags) *cobra.Command {
 			"On macOS, Chrome encrypts cookies with a key in the system keychain — you may be " +
 			"prompted by macOS to authorize keychain access.",
 		Example: "  table-reservation-goat-pp-cli auth login --chrome",
-		Annotations: map[string]string{
-			"mcp:read-only": "true",
-		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cliutil.IsVerifyEnv() {
 				fmt.Fprintln(cmd.OutOrStdout(), "would import cookies from chrome (verify mode — skipping)")

@@ -102,6 +102,13 @@ func newWatchAddCmd(flags *rootFlags) *cobra.Command {
 			if network == "" {
 				network = "auto"
 			}
+			if network == "opentable" {
+				// OT-routed watches are no-ops in v1 because OT availability
+				// watching needs the RestaurantsAvailability persisted-query
+				// hash bootstrap (v0.2). Refuse rather than store a watch the
+				// user thinks is active — silent no-ops are worse than errors.
+				return fmt.Errorf("opentable-only watches are a v0.2 feature (needs RestaurantsAvailability bootstrap). Use 'tock:<slug>' for Tock-side watches, or 'auto' (no prefix) to let watch tick poll Tock when the venue exists on both networks")
+			}
 			id := newWatchID()
 			row := watchRow{
 				ID: id, Venue: args[0], Network: network, Slug: slug,
@@ -315,17 +322,24 @@ func pollOneWatch(ctx context.Context, s *auth.Session, id, venue, network, slug
 		}
 	}
 	if tryOT && !r.Polled {
+		// OpenTable availability watching is a v0.2 feature: it requires
+		// the `RestaurantsAvailability` GraphQL persisted-query hash,
+		// which v1 doesn't bootstrap (only `Autocomplete` is captured).
+		// We MUST NOT report Polled=true here — that would let cron jobs
+		// silently miss real openings while the watch ticks daily and
+		// always reports HasMatch=false. Surface honest no-op so the
+		// user knows OT-side polling is unavailable until v0.2.
 		c, err := opentable.New(s)
 		if err == nil {
-			rdata, err := c.RestaurantBySlug(ctx, slug)
-			if err == nil && rdata != nil {
-				r.Polled = true
+			if rdata, err := c.RestaurantBySlug(ctx, slug); err == nil && rdata != nil {
 				r.Network = "opentable"
-				r.Reason = "opentable: restaurant resolved (full availability check is a v2 enhancement)"
+				r.Polled = false
+				r.Reason = "opentable: venue resolved but availability watching is a v0.2 feature (needs RestaurantsAvailability persisted-query bootstrap); this watch is a no-op on the OT side. Use Tock-routed watches (`tock:<slug>`) for real polling, or wait for v0.2."
+				return r
 			}
 		}
 	}
-	if !r.Polled {
+	if !r.Polled && r.Reason == "" {
 		r.Reason = "could not resolve venue on either network"
 	}
 	return r

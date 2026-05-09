@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/enetx/surf"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/mvanhorn/printing-press-library/library/food-and-dining/table-reservation-goat/internal/cliutil"
 	"github.com/mvanhorn/printing-press-library/library/food-and-dining/table-reservation-goat/internal/source/auth"
@@ -53,6 +54,12 @@ type Client struct {
 	http    *http.Client
 	session *auth.Session
 	limiter *cliutil.AdaptiveLimiter
+
+	// bootstrapSF dedupes concurrent Bootstrap() calls. Two goroutines
+	// that both observe a stale csrfToken would otherwise both fire
+	// the home-page GET; singleflight collapses that into a single
+	// in-flight request whose result every waiter receives.
+	bootstrapSF singleflight.Group
 
 	csrfToken      string
 	csrfFetchedAt  time.Time
@@ -157,40 +164,54 @@ func (c *Client) LoggedIn() bool {
 
 // Bootstrap fetches the OpenTable homepage to extract `__CSRF_TOKEN__`.
 // Idempotent — only refreshes when the cached token is older than csrfTTL.
+// Concurrent callers are deduplicated via singleflight so a single in-flight
+// fetch satisfies all waiters; the redundant-fetch race that the previous
+// "check-release-fetch-relock" pattern allowed is now closed.
 func (c *Client) Bootstrap(ctx context.Context) error {
 	c.mu.Lock()
-	if c.csrfToken != "" && time.Since(c.csrfFetchedAt) < c.csrfTTL {
-		c.mu.Unlock()
+	fresh := c.csrfToken != "" && time.Since(c.csrfFetchedAt) < c.csrfTTL
+	c.mu.Unlock()
+	if fresh {
 		return nil
 	}
-	c.mu.Unlock()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, Origin+"/", nil)
-	if err != nil {
-		return fmt.Errorf("building bootstrap request: %w", err)
-	}
-	req.Header.Set("Accept", "text/html,application/xhtml+xml")
-	resp, err := c.do429Aware(req)
-	if err != nil {
-		return fmt.Errorf("fetching opentable.com: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		return fmt.Errorf("opentable.com returned HTTP %d during bootstrap", resp.StatusCode)
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("reading bootstrap body: %w", err)
-	}
-	token := extractCSRFToken(body)
-	if token == "" {
-		return errors.New("could not extract __CSRF_TOKEN__ from opentable.com homepage; site structure may have changed")
-	}
-	c.mu.Lock()
-	c.csrfToken = token
-	c.csrfFetchedAt = time.Now()
-	c.mu.Unlock()
-	return nil
+	_, err, _ := c.bootstrapSF.Do("csrf", func() (any, error) {
+		// Double-check inside the singleflight closure: another caller
+		// may have completed a bootstrap between our outer check and
+		// the singleflight grant. Avoid a wasted fetch if so.
+		c.mu.Lock()
+		if c.csrfToken != "" && time.Since(c.csrfFetchedAt) < c.csrfTTL {
+			c.mu.Unlock()
+			return nil, nil
+		}
+		c.mu.Unlock()
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, Origin+"/", nil)
+		if err != nil {
+			return nil, fmt.Errorf("building bootstrap request: %w", err)
+		}
+		req.Header.Set("Accept", "text/html,application/xhtml+xml")
+		resp, err := c.do429Aware(req)
+		if err != nil {
+			return nil, fmt.Errorf("fetching opentable.com: %w", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode >= 400 {
+			return nil, fmt.Errorf("opentable.com returned HTTP %d during bootstrap", resp.StatusCode)
+		}
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("reading bootstrap body: %w", err)
+		}
+		token := extractCSRFToken(body)
+		if token == "" {
+			return nil, errors.New("could not extract __CSRF_TOKEN__ from opentable.com homepage; site structure may have changed")
+		}
+		c.mu.Lock()
+		c.csrfToken = token
+		c.csrfFetchedAt = time.Now()
+		c.mu.Unlock()
+		return nil, nil
+	})
+	return err
 }
 
 // csrfRE matches both the JSON-embedded form (which is what the SSR HTML
