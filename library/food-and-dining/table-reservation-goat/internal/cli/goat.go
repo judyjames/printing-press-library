@@ -1,5 +1,7 @@
 package cli
 
+// PATCH: novel-commands — see .printing-press-patches.json for the change-set rationale.
+
 // pp:client-call — `goat` reaches the OpenTable SSR client and the Tock client
 // through `internal/source/opentable` and `internal/source/tock`. Dogfood's
 // reimplementation_check sibling-import regex matches a single path segment

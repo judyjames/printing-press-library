@@ -1,5 +1,7 @@
 package cli
 
+// PATCH: novel-commands — see .printing-press-patches.json for the change-set rationale.
+
 import (
 	"fmt"
 

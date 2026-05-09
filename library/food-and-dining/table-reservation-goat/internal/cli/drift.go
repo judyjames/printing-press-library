@@ -1,5 +1,7 @@
 package cli
 
+// PATCH: novel-commands — see .printing-press-patches.json for the change-set rationale.
+
 // pp:client-call — `drift` calls the OpenTable and Tock clients via
 // `internal/source/opentable` and `internal/source/tock` to capture each
 // snapshot, then diffs against a local on-disk snapshot file. Dogfood's

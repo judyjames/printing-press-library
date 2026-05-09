@@ -5,6 +5,8 @@
 // Chrome.
 package auth
 
+// PATCH: cross-network-source-clients — see .printing-press-patches.json for the change-set rationale.
+
 import (
 	"encoding/json"
 	"fmt"

@@ -7,6 +7,8 @@
 // (`cf-mitigated: challenge`).
 package tock
 
+// PATCH: cross-network-source-clients — see .printing-press-patches.json for the change-set rationale.
+
 import (
 	"context"
 	"encoding/json"

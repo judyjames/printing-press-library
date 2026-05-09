@@ -6,6 +6,8 @@
 
 package cli
 
+// PATCH: scaffold-endpoint-redirects — see .printing-press-patches.json for the change-set rationale.
+
 import (
 	"strings"
 	"time"

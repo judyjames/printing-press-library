@@ -8,6 +8,8 @@
 // the TLS fingerprint and the session cookies imported via auth login.
 package opentable
 
+// PATCH: cross-network-source-clients — see .printing-press-patches.json for the change-set rationale.
+
 import (
 	"context"
 	"encoding/json"

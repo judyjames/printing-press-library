@@ -1,5 +1,7 @@
 package cli
 
+// PATCH: novel-commands — see .printing-press-patches.json for the change-set rationale.
+
 // pp:client-call — `earliest` calls OpenTable and Tock clients per venue
 // through `internal/source/opentable` and `internal/source/tock`. Dogfood's
 // reimplementation_check sibling-import regex doesn't match multi-segment
