@@ -39,11 +39,11 @@ import (
 // briefly," bot-detection recovery is "wait minutes-to-hours and possibly
 // rotate the fingerprint."
 type BotDetectionError struct {
-	URL      string
-	Status   int
-	Until    time.Time // when the cached cooldown expires; zero means "now"
-	Streak   int       // how many consecutive 403s have been observed
-	Reason   string    // human-readable cause
+	URL    string
+	Status int
+	Until  time.Time // when the cached cooldown expires; zero means "now"
+	Streak int       // how many consecutive 403s have been observed
+	Reason string    // human-readable cause
 }
 
 func (e *BotDetectionError) Error() string {
@@ -51,7 +51,7 @@ func (e *BotDetectionError) Error() string {
 	if wait < 0 {
 		wait = 0
 	}
-	return fmt.Sprintf("opentable: anti-bot cooldown (status=%d, streak=%d) — retry after %s (%s); reason: %s",
+	return fmt.Sprintf("opentable: anti-bot cooldown (status=%d, streak=%d) — retry after %s (%s); reason: %s; recovery: close Chrome briefly and run `auth login --chrome` to refresh Akamai cookies",
 		e.Status, e.Streak, wait, e.Until.Format(time.RFC3339), e.Reason)
 }
 

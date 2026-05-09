@@ -13,7 +13,6 @@ package opentable
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -81,6 +80,14 @@ type Client struct {
 // New creates a Surf-backed OpenTable client. Pass the loaded auth.Session
 // to attach the user's cookies; pass nil for an anonymous client (search,
 // availability — but not booking, my-reservations, or wishlist).
+//
+// Akamai's anti-bot cookies (`bm_sz`, `_abck`, `ftc`, …) rotate every ~30
+// minutes; the snapshot saved by `auth login --chrome` goes stale within
+// the hour and Akamai 403s any request without fresh values. We re-read
+// just those cookies from Chrome at construction time so each invocation
+// rides on whatever Chrome's challenge handling has earned recently. The
+// long-lived auth cookies still come from the saved session, so the CLI
+// keeps working when Chrome is closed.
 func New(s *auth.Session) (*Client, error) {
 	jar, err := cookiejar.New(nil)
 	if err != nil {
@@ -88,7 +95,8 @@ func New(s *auth.Session) (*Client, error) {
 	}
 	otURL, _ := auth.CookieURLFor(auth.NetworkOpenTable)
 	if s != nil && otURL != nil {
-		jar.SetCookies(otURL, s.HTTPCookies(auth.NetworkOpenTable))
+		fresh := auth.RefreshAkamaiCookies(context.Background(), "opentable.com")
+		jar.SetCookies(otURL, s.HTTPCookiesWithRefresh(auth.NetworkOpenTable, fresh))
 	}
 	surfClient := surf.NewClient().
 		Builder().
@@ -100,8 +108,8 @@ func New(s *auth.Session) (*Client, error) {
 	std.Jar = jar
 	std.Timeout = defaultTimeout
 	return &Client{
-		http:          std,
-		session:       s,
+		http:    std,
+		session: s,
 		// Conservative default rate: OpenTable's Akamai begins flagging
 		// Surf fingerprints after a burst of requests. 0.5 req/s is one
 		// request every 2 seconds — slow enough that home-page bootstrap
@@ -139,6 +147,22 @@ func (c *Client) do429Aware(req *http.Request) (*http.Response, error) {
 		body, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		_ = body
+		// Only the bootstrap path warrants a *session-wide* cooldown — a
+		// 403 there means our Surf-Chrome client is shadow-banned and
+		// subsequent calls won't get past Akamai. A 403 on any other path
+		// is operation-specific (e.g. Akamai's WAF rule on
+		// `opname=RestaurantsAvailability`) and shouldn't poison sibling
+		// operations like Autocomplete that work fine on the same session.
+		// Return a one-shot BotDetectionError without persisting.
+		if req.URL.Path != bootstrapPath {
+			return nil, &BotDetectionError{
+				URL:    req.URL.String(),
+				Status: 403,
+				Streak: 1,
+				Until:  time.Now().Add(1 * time.Minute),
+				Reason: fmt.Sprintf("403 from %s (operation-specific WAF rule, not a session-wide block)", req.URL.Path),
+			}
+		}
 		bde, sErr := setCooldown(fmt.Sprintf("403 from %s (Akamai anti-bot)", req.URL.Path))
 		if sErr != nil {
 			return nil, &BotDetectionError{
@@ -195,7 +219,17 @@ func (c *Client) LoggedIn() bool {
 	return c.session != nil && c.session.LoggedIn(auth.NetworkOpenTable)
 }
 
-// Bootstrap fetches the OpenTable homepage to extract `__CSRF_TOKEN__`.
+// bootstrapURL is the SSR page we fetch to extract a fresh `__CSRF_TOKEN__`.
+// Akamai's WAF on opentable.com is configured with a stricter rule on the
+// home page (`/`) than on `/restaurant/profile/<id>` — `/` 403s a Surf-Chrome
+// client almost immediately, while a numeric profile page returns 200 with
+// the SSR Redux state intact. We picked id=100 (Walnut Creek Yacht Club, a
+// long-lived listing) as a stable bootstrap source. The CSRF token returned
+// from this page is bound to the consumer-frontend GraphQL gateway just like
+// the home page's, so the rest of the flow is unchanged.
+const bootstrapPath = "/restaurant/profile/100"
+
+// Bootstrap fetches the OpenTable bootstrap page to extract `__CSRF_TOKEN__`.
 // Idempotent — only refreshes when the cached token is older than csrfTTL.
 // Concurrent callers are deduplicated via singleflight so a single in-flight
 // fetch satisfies all waiters.
@@ -203,7 +237,7 @@ func (c *Client) LoggedIn() bool {
 // Bot-detection cooldown: before any HTTP fetch, this method checks the
 // disk-persisted cooldown (set on prior 403s) and fast-fails with a typed
 // `*BotDetectionError` if the cooldown is still active. On a 403 from the
-// home page, it writes a new cooldown with exponential backoff per
+// bootstrap page, it writes a new cooldown with exponential backoff per
 // consecutive 403, so the next CLI invocation doesn't waste a 30s timeout
 // before failing. A successful 200 clears the cooldown.
 func (c *Client) Bootstrap(ctx context.Context) error {
@@ -229,7 +263,7 @@ func (c *Client) Bootstrap(ctx context.Context) error {
 		if active := loadActiveCooldown(); active != nil {
 			return nil, active
 		}
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, Origin+"/", nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, Origin+bootstrapPath, nil)
 		if err != nil {
 			return nil, fmt.Errorf("building bootstrap request: %w", err)
 		}
@@ -242,21 +276,21 @@ func (c *Client) Bootstrap(ctx context.Context) error {
 		if resp.StatusCode == 403 {
 			// Persistent anti-bot block — record cooldown and surface
 			// a typed error so callers render the right remediation.
-			bde, sErr := setCooldown("home-page bootstrap returned 403 (Akamai anti-bot)")
+			bde, sErr := setCooldown("bootstrap returned 403 from " + bootstrapPath + " (Akamai anti-bot)")
 			if sErr != nil {
 				// Best effort — even if persistence failed, return a
 				// transient bot-detection error so the user sees the
 				// right error class.
 				return nil, &BotDetectionError{
-					URL: Origin + "/", Status: 403, Streak: 1,
+					URL: Origin + bootstrapPath, Status: 403, Streak: 1,
 					Until:  time.Now().Add(5 * time.Minute),
-					Reason: "home-page bootstrap returned 403 (Akamai anti-bot); cooldown not persisted: " + sErr.Error(),
+					Reason: "bootstrap returned 403 from " + bootstrapPath + " (Akamai anti-bot); cooldown not persisted: " + sErr.Error(),
 				}
 			}
 			return nil, bde
 		}
 		if resp.StatusCode >= 400 {
-			return nil, fmt.Errorf("opentable.com returned HTTP %d during bootstrap", resp.StatusCode)
+			return nil, fmt.Errorf("opentable.com%s returned HTTP %d during bootstrap", bootstrapPath, resp.StatusCode)
 		}
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
@@ -264,7 +298,7 @@ func (c *Client) Bootstrap(ctx context.Context) error {
 		}
 		token := extractCSRFToken(body)
 		if token == "" {
-			return nil, errors.New("could not extract __CSRF_TOKEN__ from opentable.com homepage; site structure may have changed")
+			return nil, fmt.Errorf("could not extract __CSRF_TOKEN__ from opentable.com%s; site structure may have changed", bootstrapPath)
 		}
 		// 200 clears any previous cooldown so the next 403 starts a
 		// fresh streak rather than escalating from stale state.
@@ -330,10 +364,10 @@ func (c *Client) Autocomplete(ctx context.Context, term string, lat, lng float64
 	body := map[string]any{
 		"operationName": "Autocomplete",
 		"variables": map[string]any{
-			"term":           term,
-			"latitude":       lat,
-			"longitude":      lng,
-			"useNewVersion":  true,
+			"term":          term,
+			"latitude":      lat,
+			"longitude":     lng,
+			"useNewVersion": true,
 		},
 		"extensions": map[string]any{
 			"persistedQuery": map[string]any{
@@ -365,13 +399,13 @@ func (c *Client) Autocomplete(ctx context.Context, term string, lat, lng float64
 // `RestaurantsAvailability`. The slot tokens are short-lived (~minutes) and
 // are required to actually book the slot via `make-reservation`.
 type AvailabilitySlot struct {
-	IsAvailable          bool     `json:"isAvailable"`
-	TimeOffsetMinutes    int      `json:"timeOffsetMinutes"`
-	SlotHash             string   `json:"slotHash"`
-	SlotAvailabilityToken string  `json:"slotAvailabilityToken"`
-	PointsType           string   `json:"pointsType,omitempty"`
-	PointsValue          int      `json:"pointsValue,omitempty"`
-	Attributes           []string `json:"attributes,omitempty"`
+	IsAvailable           bool     `json:"isAvailable"`
+	TimeOffsetMinutes     int      `json:"timeOffsetMinutes"`
+	SlotHash              string   `json:"slotHash"`
+	SlotAvailabilityToken string   `json:"slotAvailabilityToken"`
+	PointsType            string   `json:"pointsType,omitempty"`
+	PointsValue           int      `json:"pointsValue,omitempty"`
+	Attributes            []string `json:"attributes,omitempty"`
 }
 
 // AvailabilityDay is one day in the availability response. `Date` is
@@ -385,7 +419,7 @@ type AvailabilityDay struct {
 // RestaurantAvailability is the per-restaurant chunk of the response: one
 // restaurant's availability across N days starting from `date`.
 type RestaurantAvailability struct {
-	RestaurantID    int               `json:"restaurantId"`
+	RestaurantID     int               `json:"restaurantId"`
 	AvailabilityDays []AvailabilityDay `json:"availabilityDays"`
 }
 
@@ -516,10 +550,18 @@ func (c *Client) gqlCall(ctx context.Context, opname string, body any) ([]byte, 
 		return nil, fmt.Errorf("building GraphQL request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Accept", "*/*")
 	req.Header.Set("X-CSRF-Token", c.CSRF())
 	req.Header.Set("Origin", Origin)
-	req.Header.Set("Referer", Origin+"/")
+	// Referer must match a page we actually browsed — Akamai cross-checks the
+	// Referer against recent navigations on this session. The bootstrap page
+	// works for every operation that doesn't require a venue-specific page.
+	req.Header.Set("Referer", Origin+bootstrapPath)
+	// apollographql-client-name is what real Chrome sends; some Akamai rules
+	// flag GraphQL requests that arrive without it as bot traffic.
+	req.Header.Set("apollographql-client-name", "fe-search")
+	req.Header.Set("apollographql-client-version", "0.0.1")
+	req.Header.Set("x-query-timeout", "10000")
 	resp, err := c.do429Aware(req)
 	if err != nil {
 		return nil, fmt.Errorf("calling %s: %w", opname, err)
@@ -529,6 +571,22 @@ func (c *Client) gqlCall(ctx context.Context, opname string, body any) ([]byte, 
 	if err != nil {
 		return nil, fmt.Errorf("reading %s response: %w", opname, err)
 	}
+	if resp.StatusCode == 403 {
+		// Akamai's WAF maintains an opname-specific block list. As of
+		// 2026-05-09, `opname=RestaurantsAvailability` is on it — even with a
+		// fresh CSRF, valid session cookies, and a known-good Referer, the
+		// edge returns "Access Denied" before the request reaches Apollo.
+		// Surface this as a typed BotDetectionError so cross-network commands
+		// can fall back to other sources cleanly. The CSRF cache stays warm;
+		// only this specific op is gated.
+		return nil, &BotDetectionError{
+			URL:    u,
+			Status: 403,
+			Streak: 1,
+			Until:  time.Now().Add(5 * time.Minute),
+			Reason: "GraphQL " + opname + " 403'd by Akamai WAF (opname-specific rule); other operations on the same session may still work",
+		}
+	}
 	if resp.StatusCode != 200 {
 		// PersistedQueryNotFound is a 400 with text/plain "Bad Request" or a
 		// JSON `errors[].extensions.code === "PERSISTED_QUERY_NOT_FOUND"`.
@@ -536,6 +594,9 @@ func (c *Client) gqlCall(ctx context.Context, opname string, body any) ([]byte, 
 		hint := ""
 		if resp.StatusCode == 400 {
 			hint = " (likely a stale persisted-query hash; run `doctor --refresh-hashes` if this is recurring)"
+		}
+		if resp.StatusCode == 409 {
+			hint = " (Apollo persisted-query gateway: body operationName must match the URL opname AND match the hash's registered name)"
 		}
 		return nil, fmt.Errorf("opentable %s returned HTTP %d%s: %s", opname, resp.StatusCode, hint, truncate(string(data), 200))
 	}

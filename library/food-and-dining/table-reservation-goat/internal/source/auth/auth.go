@@ -42,10 +42,10 @@ type Cookie struct {
 
 // Session is the on-disk authentication state for both networks.
 type Session struct {
-	Version           int      `json:"version"`
-	UpdatedAt         time.Time `json:"updated_at"`
-	OpenTableCookies  []Cookie `json:"opentable_cookies,omitempty"`
-	TockCookies       []Cookie `json:"tock_cookies,omitempty"`
+	Version          int       `json:"version"`
+	UpdatedAt        time.Time `json:"updated_at"`
+	OpenTableCookies []Cookie  `json:"opentable_cookies,omitempty"`
+	TockCookies      []Cookie  `json:"tock_cookies,omitempty"`
 }
 
 // LoggedIn returns true when the network has at least one non-expired session
@@ -100,6 +100,47 @@ func (s *Session) HTTPCookies(network string) []*http.Cookie {
 	case NetworkTock:
 		src = s.TockCookies
 	}
+	return cookiesToHTTP(src)
+}
+
+// HTTPCookiesWithRefresh returns the stored cookies for a network, with
+// Akamai/Cloudflare bot-defense cookies overlaid from a fresh Chrome read.
+// Long-lived auth cookies come from the saved session (so the CLI works
+// when Chrome is closed or after the user signed out); short-lived bot
+// cookies come from Chrome live (so Akamai's challenge-rotation doesn't
+// freeze us out). When fresh is empty the result equals HTTPCookies.
+func (s *Session) HTTPCookiesWithRefresh(network string, fresh []Cookie) []*http.Cookie {
+	var src []Cookie
+	switch strings.ToLower(network) {
+	case NetworkOpenTable:
+		src = s.OpenTableCookies
+	case NetworkTock:
+		src = s.TockCookies
+	}
+	if len(fresh) == 0 {
+		return cookiesToHTTP(src)
+	}
+	// Index fresh cookies by Name+Domain+Path so saved entries with the same
+	// key are replaced rather than duplicated. Akamai sometimes serves the
+	// same cookie name under both `.opentable.com` and `.www.opentable.com`;
+	// keying on all three avoids accidentally dropping the right one.
+	type key struct{ name, domain, path string }
+	freshKeys := make(map[key]bool, len(fresh))
+	for _, c := range fresh {
+		freshKeys[key{c.Name, c.Domain, c.Path}] = true
+	}
+	merged := make([]Cookie, 0, len(src)+len(fresh))
+	for _, c := range src {
+		if freshKeys[key{c.Name, c.Domain, c.Path}] {
+			continue
+		}
+		merged = append(merged, c)
+	}
+	merged = append(merged, fresh...)
+	return cookiesToHTTP(merged)
+}
+
+func cookiesToHTTP(src []Cookie) []*http.Cookie {
 	out := make([]*http.Cookie, 0, len(src))
 	for _, c := range src {
 		v := c.Value

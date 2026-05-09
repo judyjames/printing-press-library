@@ -66,13 +66,19 @@ func newAuthLoginCmd(flags *rootFlags) *cobra.Command {
 			if err := session.Save(); err != nil {
 				return fmt.Errorf("saving session: %w", err)
 			}
+			// `auth login --chrome` is the user's deliberate refresh path.
+			// Clear any negative-cache entry so the next OT client re-walks
+			// the keychain (which is now warm from this very kooky call) and
+			// caches the fresh Akamai cookies.
+			auth.ClearAkamaiCache("opentable.com")
+			auth.ClearAkamaiCache("exploretock.com")
 			out := map[string]any{
-				"opentable_imported": result.OpenTableImported,
-				"tock_imported":      result.TockImported,
-				"opentable_skipped":  result.OpenTableSkipped,
-				"tock_skipped":       result.TockSkipped,
+				"opentable_imported":  result.OpenTableImported,
+				"tock_imported":       result.TockImported,
+				"opentable_skipped":   result.OpenTableSkipped,
+				"tock_skipped":        result.TockSkipped,
 				"opentable_logged_in": session.LoggedIn(auth.NetworkOpenTable),
-				"tock_logged_in":     session.LoggedIn(auth.NetworkTock),
+				"tock_logged_in":      session.LoggedIn(auth.NetworkTock),
 			}
 			if len(result.Notes) > 0 {
 				out["notes"] = result.Notes
@@ -126,4 +132,3 @@ func newAuthLogoutCmd(flags *rootFlags) *cobra.Command {
 		},
 	}
 }
-

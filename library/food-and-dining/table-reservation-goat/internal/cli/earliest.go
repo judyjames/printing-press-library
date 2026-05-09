@@ -260,7 +260,12 @@ func resolveEarliestForVenue(ctx context.Context, s *auth.Session, venue string,
 			// `RestaurantsAvailability` GraphQL takes a numeric
 			// restaurantId, not a slug. Slug-format queries
 			// (`le-bernardin`) are converted to spaced names.
-			restID, restName, _, rerr := c.RestaurantIDFromQuery(ctx, slug, 0, 0)
+			// OT's Autocomplete is broken when called with lat=0/lng=0 — its
+			// `personalizer-autocomplete/v4` upstream returns INTERNAL_SERVER_ERROR
+			// without a coordinate to anchor on. Defaulting to NYC (which has
+			// the largest OT footprint) lets the GraphQL search the global
+			// index and still match restaurants in any metro.
+			restID, restName, _, rerr := c.RestaurantIDFromQuery(ctx, slug, 40.7128, -74.0060)
 			if rerr != nil {
 				row.Available = false
 				row.Reason = fmt.Sprintf("opentable: could not resolve %q (%v)", slug, rerr)
@@ -273,7 +278,17 @@ func resolveEarliestForVenue(ctx context.Context, s *auth.Session, venue string,
 			avail, aerr := c.RestaurantsAvailability(ctx, []int{restID}, date, "19:00", party, within, 150, 5)
 			if aerr != nil {
 				row.Available = false
-				row.Reason = fmt.Sprintf("opentable %s (id=%d): %v", restName, restID, aerr)
+				// Akamai's WAF currently blocks `opname=RestaurantsAvailability`.
+				// Slug-resolution still works, so the row carries the venue ID
+				// and the bookable URL — the user can click through to OT to
+				// book directly. Phrase the reason so it's clear this is OT's
+				// edge defense, not a missing reservation.
+				if _, isBot := opentable.IsBotDetection(aerr); isBot {
+					row.Reason = fmt.Sprintf("opentable %s (id=%d): availability lookup blocked by Akamai WAF on opname=RestaurantsAvailability; venue exists, book directly at %s",
+						restName, restID, row.URL)
+				} else {
+					row.Reason = fmt.Sprintf("opentable %s (id=%d): %v", restName, restID, aerr)
+				}
 				return row
 			}
 			// Find the earliest slot with isAvailable=true across all
