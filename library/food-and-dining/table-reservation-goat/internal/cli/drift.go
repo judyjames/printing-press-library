@@ -69,9 +69,12 @@ func newDriftCmd(flags *rootFlags) *cobra.Command {
 			"local snapshot. First invocation captures the baseline; subsequent " +
 			"invocations report the diff and overwrite the snapshot.",
 		Example: "  table-reservation-goat-pp-cli drift alinea --since 7d --agent",
-		Annotations: map[string]string{
-			"mcp:read-only": "true",
-		},
+		// No mcp:read-only — every invocation writes a snapshot file to
+		// ~/.cache/table-reservation-goat-pp-cli/drift/<network>/<slug>.json
+		// via writeSnapshot(). The first call also creates the directory tree.
+		// MCP hosts that honor read-only would otherwise skip the call in
+		// side-effect-prohibited contexts and the snapshot baseline would
+		// silently never be captured.
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				return cmd.Help()

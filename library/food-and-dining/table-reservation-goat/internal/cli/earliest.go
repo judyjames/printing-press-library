@@ -167,25 +167,10 @@ func resolveEarliestForVenue(ctx context.Context, s *auth.Session, venue string,
 	tryOT := network == "" || network == "opentable"
 	tryTock := network == "" || network == "tock"
 
-	if tryOT {
-		c, err := opentable.New(s)
-		if err == nil {
-			r, err := c.RestaurantBySlug(ctx, slug)
-			if err == nil && r != nil {
-				row.Network = "opentable"
-				row.URL = opentable.Origin + "/r/" + slug
-				if lat, ok := r["latitude"].(float64); ok {
-					row.Latitude = lat
-				}
-				if lng, ok := r["longitude"].(float64); ok {
-					row.Longitude = lng
-				}
-				row.Available = false
-				row.Reason = "no-availability-call-yet (v1 placeholder; full RestaurantsAvailability implementation deferred)"
-				return row
-			}
-		}
-	}
+	// Try Tock first because it has working availability via SSR
+	// `calendar.offerings`. Many venues (Canlis, Alinea, Atomix) exist on
+	// both networks; preferring Tock means the user gets a real
+	// `Available=true|false` answer rather than the OT-side honest no-op.
 	if tryTock {
 		c, err := tock.New(s)
 		if err == nil {
@@ -208,6 +193,32 @@ func resolveEarliestForVenue(ctx context.Context, s *auth.Session, venue string,
 				return row
 			}
 			row.Reason = fmt.Sprintf("tock %s: %v", slug, err)
+		}
+	}
+	if tryOT {
+		c, err := opentable.New(s)
+		if err == nil {
+			r, err := c.RestaurantBySlug(ctx, slug)
+			if err == nil && r != nil {
+				row.Network = "opentable"
+				row.URL = opentable.Origin + "/r/" + slug
+				if lat, ok := r["latitude"].(float64); ok {
+					row.Latitude = lat
+				}
+				if lng, ok := r["longitude"].(float64); ok {
+					row.Longitude = lng
+				}
+				// Honest no-op: OT availability requires the
+				// RestaurantsAvailability persisted-query hash,
+				// which v1 doesn't bootstrap. We confirmed the
+				// venue exists, but cannot answer "is a slot open?"
+				// on the OT side. Set Available=false with a
+				// reason that names the v0.2 work; do NOT pretend
+				// we polled successfully.
+				row.Available = false
+				row.Reason = "opentable: venue resolved but availability checking is a v0.2 feature (needs RestaurantsAvailability persisted-query bootstrap). For real availability, use a `tock:<slug>` prefix or pick a venue listed on Tock."
+				return row
+			}
 		}
 	}
 	if row.Network == "" {
