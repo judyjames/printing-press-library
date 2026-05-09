@@ -31,7 +31,7 @@
         "internal/cli/drift.go",
         "internal/cli/root.go"
       ],
-      "validated_outcome": "Phase 5 live dogfood: 64/64 PASS. All four transcendence commands return well-shaped JSON in dry-run; live-data paths surface honest errors when SSR JS-state can't be fully parsed (documented v0.2 gap). v0.1.3 (Greptile review): removed misleading mcp:read-only on `auth` parent group and `auth login` (login writes cookies to disk); `watch tick` no longer reports Polled=true on the OT branch (honest no-op until v0.2 RestaurantsAvailability bootstrap); `watch add` refuses opentable-prefixed slugs with a clear v0.2 error rather than storing a watch that silently never matches. v0.1.4 (Greptile follow-up): removed misleading mcp:read-only on `drift` (writes snapshot files); reordered earliest's network preference to try Tock first (real availability) before OT, with the OT branch surfacing an honest 'venue exists, availability watching is v0.2 work' rather than a misleading Available=false. v0.1.5: `earliest` and `watch tick` OT branches now fire RestaurantsAvailability for real and surface actual SlotAt/HasMatch values. The previous `watch add opentable:` rejection has been removed since OT-side polling now works."
+      "validated_outcome": "Phase 5 live dogfood: 64/64 PASS. All four transcendence commands return well-shaped JSON in dry-run; live-data paths surface honest errors when SSR JS-state can't be fully parsed (documented v0.2 gap). v0.1.3 (Greptile review): removed misleading mcp:read-only on `auth` parent group and `auth login` (login writes cookies to disk); `watch tick` no longer reports Polled=true on the OT branch (honest no-op until v0.2 RestaurantsAvailability bootstrap); `watch add` refuses opentable-prefixed slugs with a clear v0.2 error rather than storing a watch that silently never matches. v0.1.4 (Greptile follow-up): removed misleading mcp:read-only on `drift` (writes snapshot files); reordered earliest's network preference to try Tock first (real availability) before OT, with the OT branch surfacing an honest 'venue exists, availability watching is v0.2 work' rather than a misleading Available=false. v0.1.5: `earliest` and `watch tick` OT branches now fire RestaurantsAvailability for real and surface actual SlotAt/HasMatch values. The previous `watch add opentable:` rejection has been removed since OT-side polling now works. v0.1.7 (Greptile review round 3): Tock pollOneWatch now scans a 7-day forward window matching the OT branch, instead of querying only today. A watch added for 'next Saturday' now actually triggers."
     },
     {
       "id": "scaffold-endpoint-redirects",
@@ -45,6 +45,16 @@
       ],
       "validated_outcome": "Live dogfood went from 16/78 failures (placeholder 404s) to 0/64 failures after the redirects landed. `sync` returns an empty success summary instead of erroring with stream issues; `restaurants list/get` and `availability check` route through the same Surf-cleared path goat/earliest use.",
       "upstream_issue": "Multiple gaps surfaced as Printing Press retro candidates: (1) generator emits unused helpers in helpers.go; (2) dogfood reimplementation_check sibling-import regex misses multi-segment internal/source/* paths; (3) generator does not emit .printing-press-patches.json on fresh print despite library CI requiring it."
+    },
+    {
+      "id": "ratelimit-toctou-fix",
+      "summary": "Fix TOCTOU race in cliutil.AdaptiveLimiter.Wait() that defeated rate limiting under concurrent fan-out.",
+      "reason": "Greptile review identified a real correctness bug in the generator-emitted file: read lastRequest under lock, release, sleep, then re-acquire to write. Two concurrent callers would observe the same stale lastRequest, both sleep the same duration, and both update lastRequest to ~the same value \u2014 completely defeating rate limiting for the second caller. Fix: under a single lock, compute the sleep deadline, stamp lastRequest forward to that deadline, then sleep without the lock. The next caller queues serially behind the deadline. Filed as a Printing Press retro candidate (cliutil/ratelimit.go is generator-emitted; the same fix should land upstream so all printed CLIs benefit).",
+      "files": [
+        "internal/cliutil/ratelimit.go"
+      ],
+      "validated_outcome": "Build passes; goroutine-pair unit logic: A acquires lock, computes sleep=2s, stamps lastRequest = now+2s, releases. B acquires lock, sees lastRequest = (now)+2s in the future, computes sleep = delay+2s = 4s, stamps lastRequest = now+4s. Result: A sleeps 2s, B sleeps 4s \u2014 proper serialization.",
+      "upstream_issue": "Should be filed against https://github.com/mvanhorn/cli-printing-press generator template at internal/generator/templates/cliutil/ratelimit.go.tmpl"
     }
   ]
 }
