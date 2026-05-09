@@ -1,0 +1,411 @@
+// articles publish-md — markdown to X Article publishing wrapper.
+//
+// Parses a markdown file with frontmatter, converts body to Draft.js
+// content_state JSON, and prints the constructed payload in dry-run mode.
+//
+// CURRENT SCOPE (v1, 2026-05-08): text-only articles. Supported block types:
+// paragraph, header-one, header-two, unordered-list-item, ordered-list-item,
+// blockquote, plus bold/italic inline styles. Cover image via the
+// captured-but-not-yet-orchestrated upload + UpdateCoverMedia flow.
+//
+// NOT YET SUPPORTED: inline images, code blocks. The X Articles editor
+// uses Draft.js atomic blocks for these but the entityMap binding mechanism
+// is unclear from the captured HARs — it appears the entity data is
+// attached via a separate API call we haven't sniffed. For articles with
+// inline media, fall back to the user's existing publish-x-article skill
+// (which uses Playwright/CDP browser automation).
+
+package cli
+
+import (
+	"encoding/json"
+	"fmt"
+	"math/rand"
+	"os"
+	"strings"
+	"unicode/utf16"
+
+	"github.com/mvanhorn/printing-press-library/library/social-and-messaging/x-twitter/internal/client"
+	"github.com/spf13/cobra"
+)
+
+type articleFrontmatter struct {
+	Title   string   `yaml:"title"`
+	Cover   string   `yaml:"cover"`
+	Tags    []string `yaml:"tags"`
+	Summary string   `yaml:"summary"`
+}
+
+type articleParsed struct {
+	Frontmatter articleFrontmatter
+	Body        string // markdown body (post-frontmatter)
+}
+
+type draftBlock struct {
+	Data              map[string]any   `json:"data"`
+	Text              string           `json:"text"`
+	Key               string           `json:"key"`
+	Type              string           `json:"type"`
+	EntityRanges      []map[string]any `json:"entity_ranges"`
+	InlineStyleRanges []inlineStyle    `json:"inline_style_ranges"`
+}
+
+type inlineStyle struct {
+	Length int    `json:"length"`
+	Offset int    `json:"offset"`
+	Style  string `json:"style"`
+}
+
+type draftContentState struct {
+	Blocks    []draftBlock   `json:"blocks"`
+	EntityMap map[string]any `json:"entityMap"`
+}
+
+func newArticlesPublishMdCmd(flags *rootFlags) *cobra.Command {
+	var post bool
+	cmd := &cobra.Command{
+		Use:     "articles-publish-md <markdown-file>",
+		Short:   "Convert a markdown file to an X Article (text-only v1; dry-run by default)",
+		Long:    "Parses frontmatter (title, cover, tags) and body, converts body to Draft.js content_state JSON, and prints the payload. Pass --post to create and publish the article.",
+		Example: "  x-twitter-pp-cli articles-publish-md draft.md",
+		Args:    cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := os.ReadFile(args[0])
+			if err != nil {
+				return fmt.Errorf("read %s: %w", args[0], err)
+			}
+			parsed, err := ParseArticleMarkdown(string(data))
+			if err != nil {
+				return err
+			}
+			cs := MarkdownBodyToDraftJS(parsed.Body)
+			payload := map[string]any{
+				"title":         parsed.Frontmatter.Title,
+				"cover":         parsed.Frontmatter.Cover,
+				"tags":          parsed.Frontmatter.Tags,
+				"summary":       parsed.Frontmatter.Summary,
+				"content_state": cs,
+			}
+			if !post || flags.dryRun {
+				fmt.Fprintln(cmd.OutOrStdout(), "── Article payload (dry-run) ──")
+				enc := json.NewEncoder(cmd.OutOrStdout())
+				enc.SetIndent("", "  ")
+				if err := enc.Encode(payload); err != nil {
+					return err
+				}
+			}
+			if !post {
+				fmt.Fprintln(cmd.OutOrStdout(), "(DRY-RUN - pass --post to actually publish)")
+				return nil
+			}
+			if flags.dryRun {
+				fmt.Fprintln(cmd.OutOrStdout(), "(DRY-RUN - --dry-run set, skipping publish)")
+				return nil
+			}
+			if os.Getenv("PRINTING_PRESS_VERIFY") == "1" {
+				fmt.Fprintln(cmd.OutOrStdout(), "verify-env: skipping article publish")
+				return nil
+			}
+			result, err := publishMarkdownArticle(flags, parsed.Frontmatter.Title, cs)
+			if err != nil {
+				return err
+			}
+			if flags.asJSON || !isTerminal(cmd.OutOrStdout()) {
+				return json.NewEncoder(cmd.OutOrStdout()).Encode(result)
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "published article %s\n%s\n", result.ArticleID, result.URL)
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&post, "post", false, "Actually create and publish the article (default: dry-run)")
+	return cmd
+}
+
+type publishedArticleResult struct {
+	ArticleID string `json:"article_id"`
+	URL       string `json:"url"`
+	Title     string `json:"title"`
+}
+
+// PATCH: Wire the X-specific Articles create/update/publish GraphQL sequence.
+func publishMarkdownArticle(flags *rootFlags, title string, contentState draftContentState) (*publishedArticleResult, error) {
+	if strings.TrimSpace(title) == "" {
+		return nil, fmt.Errorf("frontmatter title is required when --post is set")
+	}
+	c, err := flags.newClient()
+	if err != nil {
+		return nil, err
+	}
+	features := articleGraphQLFeatures()
+
+	createBody := map[string]any{
+		"variables": map[string]any{
+			"content_state": map[string]any{"blocks": []any{}, "entity_map": []any{}},
+			"title":         "",
+		},
+		"features": features,
+		"queryId":  "g1l5N8BxGewYuCy5USe_bQ",
+	}
+	createData, _, err := c.Post(client.ArticleOpURL("ArticleEntityDraftCreate"), createBody)
+	if err != nil {
+		return nil, classifyAPIError(err, flags)
+	}
+	articleID := articleIDFromCreateResponse(createData)
+	if articleID == "" {
+		return nil, fmt.Errorf("create draft response did not include article rest_id")
+	}
+
+	updateTitleBody := map[string]any{
+		"variables": map[string]any{"articleEntityId": articleID, "title": title},
+		"features":  features,
+		"queryId":   "x75E2ABzm8_mGTg1bz8hcA",
+	}
+	if _, _, err := c.Post(client.ArticleOpURL("ArticleEntityUpdateTitle"), updateTitleBody); err != nil {
+		return nil, classifyAPIError(err, flags)
+	}
+
+	updateContentBody := map[string]any{
+		"variables": map[string]any{
+			"content_state":  articleContentStateRequest(contentState),
+			"article_entity": articleID,
+		},
+		"features": features,
+		"queryId":  "M7N2FrPrlOmu-YrVIBxFnQ",
+	}
+	if _, _, err := c.Post(client.ArticleOpURL("ArticleEntityUpdateContent"), updateContentBody); err != nil {
+		return nil, classifyAPIError(err, flags)
+	}
+
+	publishBody := map[string]any{
+		"variables": map[string]any{"articleEntityId": articleID, "visibilitySetting": "Public"},
+		"features":  features,
+		"queryId":   "m4SHicYMoWO_qkLvjhDk7Q",
+	}
+	publishData, _, err := c.Post(client.ArticleOpURL("ArticleEntityPublish"), publishBody)
+	if err != nil {
+		return nil, classifyAPIError(err, flags)
+	}
+	if publishedID := articleIDFromPublishResponse(publishData); publishedID != "" {
+		articleID = publishedID
+	}
+
+	return &publishedArticleResult{
+		ArticleID: articleID,
+		URL:       "https://x.com/i/article/" + articleID,
+		Title:     title,
+	}, nil
+}
+
+func articleGraphQLFeatures() map[string]any {
+	return map[string]any{
+		"profile_label_improvements_pcf_label_in_post_enabled":              true,
+		"responsive_web_profile_redirect_enabled":                           false,
+		"rweb_tipjar_consumption_enabled":                                   false,
+		"verified_phone_label_enabled":                                      false,
+		"responsive_web_graphql_skip_user_profile_image_extensions_enabled": false,
+		"responsive_web_graphql_timeline_navigation_enabled":                true,
+	}
+}
+
+func articleContentStateRequest(cs draftContentState) map[string]any {
+	return map[string]any{
+		"blocks":     cs.Blocks,
+		"entity_map": []any{},
+	}
+}
+
+func articleIDFromCreateResponse(data []byte) string {
+	var response struct {
+		Data struct {
+			CreateDraft struct {
+				ArticleEntityResults struct {
+					Result struct {
+						RestID string `json:"rest_id"`
+					} `json:"result"`
+				} `json:"article_entity_results"`
+			} `json:"articleentity_create_draft"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(data, &response) != nil {
+		return ""
+	}
+	return response.Data.CreateDraft.ArticleEntityResults.Result.RestID
+}
+
+func articleIDFromPublishResponse(data []byte) string {
+	var response struct {
+		Data struct {
+			Publish struct {
+				ArticleEntityResults struct {
+					Result struct {
+						RestID string `json:"rest_id"`
+					} `json:"result"`
+				} `json:"article_entity_results"`
+			} `json:"articleentity_publish"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(data, &response) != nil {
+		return ""
+	}
+	return response.Data.Publish.ArticleEntityResults.Result.RestID
+}
+
+// ParseArticleMarkdown extracts frontmatter and body from a markdown string.
+// Frontmatter is delimited by --- on its own line at the start.
+func ParseArticleMarkdown(s string) (*articleParsed, error) {
+	out := &articleParsed{}
+	lines := strings.Split(s, "\n")
+	if len(lines) > 0 && strings.TrimSpace(lines[0]) == "---" {
+		// Find closing ---
+		end := -1
+		for i := 1; i < len(lines); i++ {
+			if strings.TrimSpace(lines[i]) == "---" {
+				end = i
+				break
+			}
+		}
+		if end > 0 {
+			fm := strings.Join(lines[1:end], "\n")
+			parseFrontmatter(fm, &out.Frontmatter)
+			out.Body = strings.Join(lines[end+1:], "\n")
+			return out, nil
+		}
+	}
+	out.Body = s
+	return out, nil
+}
+
+// parseFrontmatter does a minimal YAML-subset parse: scalar strings, simple
+// inline arrays. Sufficient for title/cover/summary/tags.
+func parseFrontmatter(yamlSrc string, fm *articleFrontmatter) {
+	for _, line := range strings.Split(yamlSrc, "\n") {
+		idx := strings.Index(line, ":")
+		if idx <= 0 {
+			continue
+		}
+		key := strings.TrimSpace(line[:idx])
+		val := strings.TrimSpace(line[idx+1:])
+		val = strings.Trim(val, `"' `)
+		switch key {
+		case "title":
+			fm.Title = val
+		case "cover":
+			fm.Cover = val
+		case "summary":
+			fm.Summary = val
+		case "tags":
+			val = strings.TrimPrefix(val, "[")
+			val = strings.TrimSuffix(val, "]")
+			for _, tag := range strings.Split(val, ",") {
+				t := strings.TrimSpace(strings.Trim(tag, `"' `))
+				if t != "" {
+					fm.Tags = append(fm.Tags, t)
+				}
+			}
+		}
+	}
+}
+
+// MarkdownBodyToDraftJS converts a markdown body to a Draft.js content_state.
+// Supports: paragraph, header-one (# ), header-two (## ), unordered-list-item,
+// ordered-list-item, blockquote, plus inline bold (**...**) and italic (*...*).
+// Code fences are emitted as paragraphs in v1 (atomic block needs entity binding
+// research that's deferred — see file header).
+func MarkdownBodyToDraftJS(md string) draftContentState {
+	cs := draftContentState{EntityMap: map[string]any{}}
+	for _, raw := range strings.Split(md, "\n") {
+		line := strings.TrimRight(raw, " \t")
+		trim := strings.TrimSpace(line)
+		if trim == "" {
+			continue
+		}
+		blk := draftBlock{
+			Data:              map[string]any{},
+			Key:               randBlockKey(),
+			Type:              "unstyled",
+			EntityRanges:      []map[string]any{},
+			InlineStyleRanges: []inlineStyle{},
+		}
+		switch {
+		case strings.HasPrefix(trim, "# "):
+			blk.Type = "header-one"
+			blk.Text = strings.TrimSpace(trim[2:])
+		case strings.HasPrefix(trim, "## "):
+			blk.Type = "header-two"
+			blk.Text = strings.TrimSpace(trim[3:])
+		case strings.HasPrefix(trim, "> "):
+			blk.Type = "blockquote"
+			blk.Text = strings.TrimSpace(trim[2:])
+		case strings.HasPrefix(trim, "- ") || strings.HasPrefix(trim, "* "):
+			blk.Type = "unordered-list-item"
+			blk.Text = strings.TrimSpace(trim[2:])
+		case len(trim) > 2 && trim[0] >= '0' && trim[0] <= '9' && (strings.HasPrefix(trim[1:], ". ") || strings.HasPrefix(trim[2:], ". ")):
+			blk.Type = "ordered-list-item"
+			dot := strings.Index(trim, ". ")
+			blk.Text = strings.TrimSpace(trim[dot+2:])
+		default:
+			blk.Text = trim
+		}
+		blk.Text, blk.InlineStyleRanges = extractInlineStyles(blk.Text)
+		cs.Blocks = append(cs.Blocks, blk)
+	}
+	return cs
+}
+
+// extractInlineStyles scans a string for **bold** and *italic* markers and
+// returns the cleaned text plus the inline_style_ranges that describe them.
+//
+// Offsets/lengths use UTF-16 code units to match Draft.js — JS strings are
+// indexed by UTF-16 code units. Byte-based offsets would be wrong for
+// non-ASCII text (every emoji, accented char, CJK char throws off the math).
+func extractInlineStyles(s string) (string, []inlineStyle) {
+	ranges := []inlineStyle{}
+	out := strings.Builder{}
+	i := 0
+	for i < len(s) {
+		// Bold first (**...**) so it doesn't get consumed as italic.
+		if i+2 <= len(s) && s[i:i+2] == "**" {
+			end := strings.Index(s[i+2:], "**")
+			if end >= 0 {
+				inner := s[i+2 : i+2+end]
+				offset := utf16Len(out.String())
+				out.WriteString(inner)
+				ranges = append(ranges, inlineStyle{Offset: offset, Length: utf16Len(inner), Style: "Bold"})
+				i = i + 2 + end + 2
+				continue
+			}
+		}
+		// Italic (*...*), single asterisk
+		if s[i] == '*' && (i == 0 || s[i-1] != '*') {
+			end := strings.Index(s[i+1:], "*")
+			if end >= 0 && end > 0 && (i+1+end+1 >= len(s) || s[i+1+end+1] != '*') {
+				inner := s[i+1 : i+1+end]
+				offset := utf16Len(out.String())
+				out.WriteString(inner)
+				ranges = append(ranges, inlineStyle{Offset: offset, Length: utf16Len(inner), Style: "Italic"})
+				i = i + 1 + end + 1
+				continue
+			}
+		}
+		out.WriteByte(s[i])
+		i++
+	}
+	return out.String(), ranges
+}
+
+// utf16Len returns the number of UTF-16 code units required to encode s.
+// Equivalent to s.length in JavaScript — a BMP rune counts as 1, a
+// supplementary rune (emoji, etc.) counts as 2.
+func utf16Len(s string) int {
+	return len(utf16.Encode([]rune(s)))
+}
+
+// randBlockKey produces a 5-char alphanumeric key in the shape Draft.js uses.
+func randBlockKey() string {
+	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, 5)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(b)
+}
