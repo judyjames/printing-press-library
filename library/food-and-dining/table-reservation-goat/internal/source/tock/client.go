@@ -24,6 +24,7 @@ import (
 	"github.com/enetx/surf"
 
 	"github.com/mvanhorn/printing-press-library/library/food-and-dining/table-reservation-goat/internal/source/auth"
+	"github.com/mvanhorn/printing-press-library/library/food-and-dining/table-reservation-goat/internal/source/jseval"
 )
 
 const (
@@ -191,13 +192,25 @@ func (c *Client) FetchReduxState(ctx context.Context, path string) (map[string]a
 	if err != nil {
 		return nil, fmt.Errorf("reading tock %s body: %w", path, err)
 	}
-	jsonBody, err := extractReduxState(body)
+	// Primary path: goja-based JS evaluation. Tock's $REDUX_STATE is JS-shaped
+	// (`undefined`, function expressions, occasional regex literals) so pure
+	// JSON parsing rejects most live responses. goja evaluates the assignment
+	// in a sandbox and JSON.stringify drops the JS-only constructs.
+	jsonBody, err := jseval.ExtractObjectLiteral(body, reduxStateAnchor)
 	if err != nil {
 		return nil, fmt.Errorf("tock: $REDUX_STATE not found in %s (%w)", path, err)
 	}
-	cleaned := stripJSUndefined(jsonBody)
 	var state map[string]any
-	if err := json.Unmarshal(cleaned, &state); err != nil {
+	if err := json.Unmarshal(jsonBody, &state); err != nil {
+		// Fallback: legacy regex+strip path for the corner case where goja's
+		// output trips json.Unmarshal in a way the strip path doesn't.
+		legacy, lerr := extractReduxState(body)
+		if lerr == nil {
+			cleaned := stripJSUndefined(legacy)
+			if err2 := json.Unmarshal(cleaned, &state); err2 == nil {
+				return state, nil
+			}
+		}
 		return nil, fmt.Errorf("parsing tock $REDUX_STATE from %s: %w", path, err)
 	}
 	return state, nil
@@ -302,22 +315,42 @@ func (c *Client) VenueAvailability(ctx context.Context, slug string, date string
 	if av, ok := state["availability"].(map[string]any); ok {
 		out["availability"] = av
 	}
-	if biz, ok := state["business"].(map[string]any); ok {
-		out["business"] = biz
+	// Business identity is at app.config.business, not the top-level
+	// business slice (which is just request-tracking metadata).
+	if app, ok := state["app"].(map[string]any); ok {
+		if cfg, ok := app["config"].(map[string]any); ok {
+			if biz, ok := cfg["business"].(map[string]any); ok && len(biz) > 0 {
+				out["business"] = biz
+			}
+		}
 	}
 	return out, nil
 }
 
 // VenueDetail fetches `/<venue>` and extracts business + offerings from the
 // SSR Redux state.
+//
+// Business identity (id, name, city, cuisine, etc.) lives at
+// `state.app.config.business` after SSR hydration; the top-level
+// `state.business` slice is just request-tracking metadata. We surface the
+// hydrated business object as the canonical `business` field on the return,
+// and additionally include `state.app.activeAuth.businessId` so callers can
+// hit `/api/business/<id>` for the full REST detail when needed.
 func (c *Client) VenueDetail(ctx context.Context, slug string) (map[string]any, error) {
 	state, err := c.FetchReduxState(ctx, "/"+strings.TrimPrefix(slug, "/"))
 	if err != nil {
 		return nil, err
 	}
 	out := map[string]any{}
-	if biz, ok := state["business"].(map[string]any); ok {
-		out["business"] = biz
+	if app, ok := state["app"].(map[string]any); ok {
+		if cfg, ok := app["config"].(map[string]any); ok {
+			if biz, ok := cfg["business"].(map[string]any); ok && len(biz) > 0 {
+				out["business"] = biz
+			}
+		}
+		if activeAuth, ok := app["activeAuth"].(map[string]any); ok {
+			out["active_auth"] = activeAuth
+		}
 	}
 	if cal, ok := state["calendar"].(map[string]any); ok {
 		out["calendar"] = cal

@@ -20,6 +20,7 @@ import (
 	"github.com/mvanhorn/printing-press-library/library/food-and-dining/table-reservation-goat/internal/cliutil"
 	"github.com/mvanhorn/printing-press-library/library/food-and-dining/table-reservation-goat/internal/source/auth"
 	"github.com/mvanhorn/printing-press-library/library/food-and-dining/table-reservation-goat/internal/source/opentable"
+	"github.com/mvanhorn/printing-press-library/library/food-and-dining/table-reservation-goat/internal/source/tock"
 )
 
 // goatResult is one merged row from a cross-network search.
@@ -150,58 +151,43 @@ func goatQueryOpenTable(ctx context.Context, s *auth.Session, query string, lat,
 		// Default to NYC midtown if no geo provided.
 		lat, lng = 40.7589, -73.9851
 	}
-	// Prefer the SSR /s path: no CSRF token bootstrap, full JSON-typed
-	// restaurant cards in __INITIAL_STATE__.multiSearch. The Autocomplete
-	// GraphQL is a v2 enhancement that requires a robust persisted-query
-	// hash refresh strategy.
-	rests, err := c.SearchRestaurants(ctx, opentable.SearchOptions{
-		Query:     query,
-		Latitude:  lat,
-		Longitude: lng,
-		Covers:    2,
-		Limit:     20,
-	})
+	// Use the GraphQL Autocomplete endpoint. OpenTable's /s search and
+	// /r/<slug> pages both return a 2.5KB SPA shell to non-Chrome clients —
+	// only the home page (/) serves real SSR data, and that data is the home
+	// view, not search results. The Autocomplete persisted-query is the only
+	// reliable path; it bootstraps CSRF from the home page (one cached fetch
+	// per process lifetime) and then queries by term + lat/lng.
+	results, err := c.Autocomplete(ctx, query, lat, lng)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]goatResult, 0, len(rests))
+	out := make([]goatResult, 0, len(results))
 	q := strings.ToLower(query)
-	for _, r := range rests {
-		name, _ := r["name"].(string)
-		slug, _ := r["urlSlug"].(string)
-		if slug == "" {
-			if rid, ok := r["restaurantId"].(float64); ok {
-				slug = fmt.Sprintf("%d", int(rid))
-			}
-		}
-		neighborhood, _ := r["neighborhood"].(string)
-		metro, _ := r["metroName"].(string)
+	for _, r := range results {
+		// Score by match quality. Substring of full query → 0.95;
+		// matching just the first token → 0.65; otherwise prefix
+		// confidence from the autocomplete API → 0.4.
 		score := 0.4
-		if strings.Contains(strings.ToLower(name), q) {
+		nameLower := strings.ToLower(r.Name)
+		if strings.Contains(nameLower, q) {
 			score = 0.95
+		} else if firstTok := firstToken(q); firstTok != "" && strings.Contains(nameLower, firstTok) {
+			score = 0.65
 		}
-		var lat2, lng2 float64
-		if coords, ok := r["coordinates"].(map[string]any); ok {
-			lat2, _ = coords["latitude"].(float64)
-			lng2, _ = coords["longitude"].(float64)
-		}
+		// OT autocomplete doesn't return urlSlug; use the restaurant
+		// profile path keyed by id, which is the stable canonical link.
 		url := ""
-		if slug != "" {
-			url = opentable.Origin + "/r/" + slug
-		}
-		id := ""
-		if rid, ok := r["restaurantId"].(float64); ok {
-			id = fmt.Sprintf("%d", int(rid))
+		if r.ID != "" {
+			url = opentable.Origin + "/restaurant/profile/" + r.ID
 		}
 		out = append(out, goatResult{
 			Network:      "opentable",
-			ID:           id,
-			Name:         name,
-			Slug:         slug,
-			Neighborhood: neighborhood,
-			Metro:        metro,
-			Latitude:     lat2,
-			Longitude:    lng2,
+			ID:           r.ID,
+			Name:         r.Name,
+			Metro:        r.MetroName,
+			Neighborhood: r.NeighborhoodName,
+			Latitude:     r.Latitude,
+			Longitude:    r.Longitude,
 			URL:          url,
 			MatchScore:   score,
 		})
@@ -209,19 +195,58 @@ func goatQueryOpenTable(ctx context.Context, s *auth.Session, query string, lat,
 	return out, nil
 }
 
+func firstToken(s string) string {
+	for i, r := range s {
+		if r == ' ' || r == '\t' {
+			return s[:i]
+		}
+	}
+	return s
+}
+
 func goatQueryTock(ctx context.Context, s *auth.Session, query string) ([]goatResult, error) {
-	// Tock has no public search endpoint. The only viable read path is to
-	// resolve the query as a venue slug directly (lowercase, dashed). For
-	// v1 we attempt the dashed-slug match against /<slug>; if that 404s the
-	// venue isn't on Tock under that name. A future enhancement will scrape
-	// Tock's metro pages (e.g., /chicago) and FTS them locally.
+	// Tock has no public search endpoint. The viable read path is to
+	// resolve the query as a venue slug directly (`canlis`, `alinea`,
+	// `le-bernardin`) against `/<slug>`. If the SSR Redux state has a
+	// `business` slice, the venue exists on Tock. v0.2 will also scrape
+	// metro pages (e.g., /seattle) for broader discovery.
 	slug := slugify(query)
 	if slug == "" {
 		return nil, nil
 	}
-	// Best-effort: don't fail the whole goat call if Tock has no match;
-	// just return zero results from this source.
-	return []goatResult{}, nil
+	c, err := tock.New(s)
+	if err != nil {
+		return nil, err
+	}
+	detail, err := c.VenueDetail(ctx, slug)
+	if err != nil {
+		// 404 / no Tock venue under that slug. Don't fail the whole goat
+		// call — just contribute zero rows from this source.
+		return []goatResult{}, nil
+	}
+	biz, ok := detail["business"].(map[string]any)
+	if !ok || len(biz) == 0 {
+		return []goatResult{}, nil
+	}
+	row := goatResult{
+		Network:    "tock",
+		MatchScore: 0.95,
+		URL:        tock.Origin + "/" + slug,
+		Slug:       slug,
+	}
+	if name, ok := biz["name"].(string); ok {
+		row.Name = name
+	}
+	if id, ok := biz["id"].(float64); ok {
+		row.ID = fmt.Sprintf("%d", int(id))
+	}
+	if city, ok := biz["city"].(string); ok {
+		row.Metro = city
+	}
+	if cuisine, ok := biz["cuisine"].(string); ok {
+		row.Cuisine = cuisine
+	}
+	return []goatResult{row}, nil
 }
 
 func slugify(s string) string {

@@ -7,20 +7,21 @@
     {
       "id": "cross-network-source-clients",
       "summary": "Hand-written Surf-based source clients for OpenTable (GraphQL + SSR) and Tock (REST + SSR), plus a shared session-cookie store imported from local Chrome via kooky.",
-      "reason": "Both consumer sites sit behind Akamai/Cloudflare bot defense; Surf's Chrome TLS fingerprint clears them. The OpenTable Partner API is gated and Tock has no public REST API, so the only viable path is the consumer-side surface — there's no upstream spec to generate from, so these are net-new packages outside the generator's control. The packages live in `internal/source/{auth,opentable,tock}/` and back the goat/watch/earliest/drift commands.",
+      "reason": "Both consumer sites sit behind Akamai/Cloudflare bot defense; Surf's Chrome TLS fingerprint clears them. The OpenTable Partner API is gated and Tock has no public REST API, so the only viable path is the consumer-side surface \u2014 there's no upstream spec to generate from, so these are net-new packages outside the generator's control. The packages live in `internal/source/{auth,opentable,tock}/` and back the goat/watch/earliest/drift commands.",
       "files": [
         "internal/source/auth/auth.go",
         "internal/source/auth/chrome.go",
         "internal/source/opentable/client.go",
         "internal/source/opentable/ssr.go",
-        "internal/source/tock/client.go"
+        "internal/source/tock/client.go",
+        "internal/source/jseval/jseval.go"
       ],
-      "validated_outcome": "Live test: 24 OpenTable cookies + 29 Tock cookies imported via `auth login --chrome`; `auth status` reports both networks logged_in: true."
+      "validated_outcome": "Live test: 24 OpenTable cookies + 29 Tock cookies imported via `auth login --chrome`; `auth status` reports both networks logged_in: true. v0.1.1: goja-based JS evaluator (jseval) replaced naive balanced-brace + regex strip; live `goat 'canlis'` now returns Canlis on both networks (Tock id=4891, OT id=6309)."
     },
     {
       "id": "novel-commands",
       "summary": "Five hand-written novel commands (auth, goat, watch, earliest, drift) registered in root.go, implementing the cross-network unified search, cancellation watcher, multi-venue earliest-available, and per-venue change feed.",
-      "reason": "Phase 1.5 absorb manifest approved a tight-v1 with 4 transcendence features (goat, watch, earliest, drift) plus auth login --chrome cookie import. None of these have a generator-template equivalent — they require local SQLite (watch), cross-network composition (goat, earliest), and snapshot diffing (drift). root.go is modified to register them.",
+      "reason": "Phase 1.5 absorb manifest approved a tight-v1 with 4 transcendence features (goat, watch, earliest, drift) plus auth login --chrome cookie import. None of these have a generator-template equivalent \u2014 they require local SQLite (watch), cross-network composition (goat, earliest), and snapshot diffing (drift). root.go is modified to register them.",
       "files": [
         "internal/cli/auth.go",
         "internal/cli/goat.go",
@@ -34,7 +35,7 @@
     {
       "id": "scaffold-endpoint-redirects",
       "summary": "Generated scaffold endpoints (restaurants list/get, availability check) rewritten to delegate to the cross-network source clients so they hit real Surf-cleared SSR data instead of opentable.com placeholder paths that 404.",
-      "reason": "The internal YAML spec defines /restaurants and /availability as REST paths with placeholder paths because OpenTable doesn't expose REST equivalents. The generated scaffold's client.Get(...) calls 404 against the live consumer site. Without these redirects the resource-style commands would always fail — and the user's headline workflow (find a restaurant, check availability) needs them to work. Each rewrite preserves the spec annotations (pp:endpoint, pp:method, pp:path, mcp:read-only) so the typed MCP surface keeps working; only RunE is changed.",
+      "reason": "The internal YAML spec defines /restaurants and /availability as REST paths with placeholder paths because OpenTable doesn't expose REST equivalents. The generated scaffold's client.Get(...) calls 404 against the live consumer site. Without these redirects the resource-style commands would always fail \u2014 and the user's headline workflow (find a restaurant, check availability) needs them to work. Each rewrite preserves the spec annotations (pp:endpoint, pp:method, pp:path, mcp:read-only) so the typed MCP surface keeps working; only RunE is changed.",
       "files": [
         "internal/cli/restaurants_list.go",
         "internal/cli/restaurants_get.go",

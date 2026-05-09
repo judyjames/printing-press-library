@@ -132,7 +132,12 @@ func (c *Client) Bootstrap(ctx context.Context) error {
 	return nil
 }
 
-var csrfRE = regexp.MustCompile(`window\.__CSRF_TOKEN__\s*=\s*['"]([0-9a-fA-F-]{16,})['"]`)
+// csrfRE matches both the JSON-embedded form (which is what the SSR HTML
+// actually serves: `"__CSRF_TOKEN__":"<uuid>"`) and the runtime JS-assignment
+// form (`window.__CSRF_TOKEN__ = "<uuid>"`). The JSON form is what we get
+// from a Surf-cleared GET on the home page; the JS form is what real Chrome
+// sees after JS hydration. Either is acceptable.
+var csrfRE = regexp.MustCompile(`(?:window\.__CSRF_TOKEN__\s*=\s*['"]|"__CSRF_TOKEN__"\s*:\s*")([0-9a-fA-F-]{16,})`)
 
 func extractCSRFToken(html []byte) string {
 	m := csrfRE.FindSubmatch(html)

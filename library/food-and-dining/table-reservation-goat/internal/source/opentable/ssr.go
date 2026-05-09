@@ -11,14 +11,20 @@ import (
 	"regexp"
 
 	"github.com/mvanhorn/printing-press-library/library/food-and-dining/table-reservation-goat/internal/cliutil"
+	"github.com/mvanhorn/printing-press-library/library/food-and-dining/table-reservation-goat/internal/source/jseval"
 )
 
-// initialStateAnchor finds the start of the __INITIAL_STATE__ JSON.
-// We can't use a regex for the JSON body itself because OT's state is
-// 100+ KB of nested JSON; a regex either over-matches (greedy across
-// scripts) or under-matches (non-greedy stopping at the first `}`). We
-// anchor to `__INITIAL_STATE__ = ` and walk braces manually.
-var initialStateAnchor = regexp.MustCompile(`__INITIAL_STATE__\s*=\s*(?:JSON\.parse\((['"]))?`)
+// initialStateAnchor matches both forms OT can serve:
+//
+//   1. JSON-embedded:  `"__INITIAL_STATE__":{...}` — what the static SSR HTML
+//      actually contains. The data lives inline within a larger JSON document
+//      that JS hydrates at runtime.
+//   2. JS-assignment:  `window.__INITIAL_STATE__ = {...}` or
+//      `__INITIAL_STATE__ = {...}` — the post-hydration runtime form.
+//
+// goja's evaluator handles both because the literal that follows the anchor
+// is the object we want; the assignment LHS is irrelevant.
+var initialStateAnchor = regexp.MustCompile(`(?:"__INITIAL_STATE__"\s*:|__INITIAL_STATE__\s*=)\s*(?:JSON\.parse\((['"]))?`)
 
 // FetchInitialState fetches an OpenTable page and extracts __INITIAL_STATE__
 // as parsed JSON. Use this for read-paths where the SSR-rendered state has
@@ -50,12 +56,25 @@ func (c *Client) FetchInitialState(ctx context.Context, path string) (map[string
 	if err != nil {
 		return nil, fmt.Errorf("reading %s body: %w", path, err)
 	}
-	jsonBody, err := extractInitialState(body)
+	// Primary path: goja-based JS evaluation. Handles `undefined`, function
+	// expressions, regex literals, NaN, Infinity — anything pure JSON would
+	// reject. Falls back to balanced-brace + JSON.Unmarshal only if the
+	// evaluator fails (rare; usually means anchor not present).
+	jsonBody, err := jseval.ExtractObjectLiteral(body, initialStateAnchor)
 	if err != nil {
 		return nil, fmt.Errorf("opentable: __INITIAL_STATE__ not found in %s response (%w)", path, err)
 	}
 	var state map[string]any
 	if err := json.Unmarshal(jsonBody, &state); err != nil {
+		// Fallback: maybe goja produced JSON the parser rejects (extremely rare).
+		// Try the legacy balanced-brace path so we don't fail loudly when the
+		// extractor is correct but JSON.Unmarshal is finicky about a corner case.
+		legacy, lerr := extractInitialState(body)
+		if lerr == nil {
+			if err2 := json.Unmarshal(legacy, &state); err2 == nil {
+				return state, nil
+			}
+		}
 		return nil, fmt.Errorf("parsing __INITIAL_STATE__ from %s: %w", path, err)
 	}
 	return state, nil
