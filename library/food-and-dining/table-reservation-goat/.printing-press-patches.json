@@ -16,7 +16,7 @@
         "internal/source/tock/client.go",
         "internal/source/jseval/jseval.go"
       ],
-      "validated_outcome": "Live test: 24 OpenTable cookies + 29 Tock cookies imported via `auth login --chrome`; `auth status` reports both networks logged_in: true. v0.1.1: goja-based JS evaluator (jseval) replaced naive balanced-brace + regex strip; live `goat 'canlis'` now returns Canlis on both networks (Tock id=4891, OT id=6309)."
+      "validated_outcome": "Live test: 24 OpenTable cookies + 29 Tock cookies imported via `auth login --chrome`; `auth status` reports both networks logged_in: true. v0.1.1: goja-based JS evaluator (jseval) replaced naive balanced-brace + regex strip; live `goat 'canlis'` now returns Canlis on both networks (Tock id=4891, OT id=6309). v0.1.2: AdaptiveLimiter + typed RateLimitError wired into both source clients (do429Aware helper) \u2014 single 429 retry with Retry-After backoff, then surface as hard error so empty-on-throttle stops being indistinguishable from 'no data exists'. OT floor 0.5 req/s, Tock 1.0 req/s; both ramp via OnSuccess after 10 consecutive successes."
     },
     {
       "id": "novel-commands",

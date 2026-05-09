@@ -23,6 +23,7 @@ import (
 
 	"github.com/enetx/surf"
 
+	"github.com/mvanhorn/printing-press-library/library/food-and-dining/table-reservation-goat/internal/cliutil"
 	"github.com/mvanhorn/printing-press-library/library/food-and-dining/table-reservation-goat/internal/source/auth"
 	"github.com/mvanhorn/printing-press-library/library/food-and-dining/table-reservation-goat/internal/source/jseval"
 )
@@ -38,6 +39,7 @@ const (
 type Client struct {
 	http    *http.Client
 	session *auth.Session
+	limiter *cliutil.AdaptiveLimiter
 }
 
 // New creates a Surf-backed Tock client with optional session cookies.
@@ -59,7 +61,60 @@ func New(s *auth.Session) (*Client, error) {
 	std := surfClient.Std()
 	std.Jar = jar
 	std.Timeout = defaultTimeout
-	return &Client{http: std, session: s}, nil
+	return &Client{
+		http:    std,
+		session: s,
+		// Tock's Cloudflare is more permissive than OT's Akamai. 1 req/s
+		// floor is comfortable; AdaptiveLimiter ramps up after 10
+		// successes and halves on 429.
+		limiter: cliutil.NewAdaptiveLimiter(1.0),
+	}, nil
+}
+
+// do429Aware paces a Tock HTTP request through the adaptive limiter, retries
+// once on HTTP 429 with the Retry-After hint, and returns a typed
+// `*cliutil.RateLimitError` when retries are exhausted. Empty-on-throttle
+// would be indistinguishable from "no data exists" — callers must surface
+// this error rather than treating it as a missing venue.
+func (c *Client) do429Aware(req *http.Request) (*http.Response, error) {
+	c.limiter.Wait()
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusTooManyRequests {
+		c.limiter.OnSuccess()
+		return resp, nil
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	c.limiter.OnRateLimit()
+	wait := cliutil.RetryAfter(resp)
+	time.Sleep(wait)
+	clonedReq := req.Clone(req.Context())
+	if req.Body != nil && req.GetBody != nil {
+		newBody, gerr := req.GetBody()
+		if gerr == nil {
+			clonedReq.Body = newBody
+		}
+	}
+	c.limiter.Wait()
+	resp2, err := c.http.Do(clonedReq)
+	if err != nil {
+		return nil, err
+	}
+	if resp2.StatusCode != http.StatusTooManyRequests {
+		c.limiter.OnSuccess()
+		return resp2, nil
+	}
+	body2, _ := io.ReadAll(resp2.Body)
+	resp2.Body.Close()
+	c.limiter.OnRateLimit()
+	return nil, &cliutil.RateLimitError{
+		URL:        req.URL.String(),
+		RetryAfter: cliutil.RetryAfter(resp2),
+		Body:       string(body2) + " (initial body: " + string(body) + ")",
+	}
 }
 
 // LoggedIn reports whether the client has a Tock session cookie.
@@ -92,7 +147,7 @@ func (c *Client) BusinessByID(ctx context.Context, id int) (*Business, error) {
 		return nil, fmt.Errorf("building Tock business request: %w", err)
 	}
 	req.Header.Set("Accept", "application/json")
-	resp, err := c.http.Do(req)
+	resp, err := c.do429Aware(req)
 	if err != nil {
 		return nil, fmt.Errorf("calling tock /business/%d: %w", id, err)
 	}
@@ -138,7 +193,7 @@ func (c *Client) CurrentPatron(ctx context.Context) (*Patron, error) {
 		return nil, fmt.Errorf("building tock patron request: %w", err)
 	}
 	req.Header.Set("Accept", "application/json")
-	resp, err := c.http.Do(req)
+	resp, err := c.do429Aware(req)
 	if err != nil {
 		return nil, fmt.Errorf("calling tock /patron: %w", err)
 	}
@@ -177,7 +232,7 @@ func (c *Client) FetchReduxState(ctx context.Context, path string) (map[string]a
 		return nil, fmt.Errorf("building tock SSR request: %w", err)
 	}
 	req.Header.Set("Accept", "text/html,application/xhtml+xml")
-	resp, err := c.http.Do(req)
+	resp, err := c.do429Aware(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetching tock %s: %w", path, err)
 	}

@@ -26,6 +26,7 @@ import (
 
 	"github.com/enetx/surf"
 
+	"github.com/mvanhorn/printing-press-library/library/food-and-dining/table-reservation-goat/internal/cliutil"
 	"github.com/mvanhorn/printing-press-library/library/food-and-dining/table-reservation-goat/internal/source/auth"
 )
 
@@ -51,6 +52,7 @@ type Client struct {
 	mu      sync.Mutex
 	http    *http.Client
 	session *auth.Session
+	limiter *cliutil.AdaptiveLimiter
 
 	csrfToken      string
 	csrfFetchedAt  time.Time
@@ -83,9 +85,68 @@ func New(s *auth.Session) (*Client, error) {
 	return &Client{
 		http:          std,
 		session:       s,
+		// Conservative default rate: OpenTable's Akamai begins flagging
+		// Surf fingerprints after a burst of requests. 0.5 req/s is one
+		// request every 2 seconds — slow enough that home-page bootstrap
+		// and a few GraphQL calls per CLI invocation never approach the
+		// soft cap. AdaptiveLimiter ramps up after 10 consecutive
+		// successes, so steady-state usage will reach a higher rate
+		// naturally; bursts are paced.
+		limiter:       cliutil.NewAdaptiveLimiter(0.5),
 		csrfTTL:       30 * time.Minute,
 		autocompleteH: AutocompleteHash,
 	}, nil
+}
+
+// do429Aware paces a request through the adaptive limiter, retries once on
+// HTTP 429 with the Retry-After hint, and returns a typed
+// `*cliutil.RateLimitError` when retries are exhausted. Empty-on-throttle is
+// a recipe for silent data corruption: callers MUST surface this error
+// rather than treating it as "no data exists".
+func (c *Client) do429Aware(req *http.Request) (*http.Response, error) {
+	c.limiter.Wait()
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusTooManyRequests {
+		c.limiter.OnSuccess()
+		return resp, nil
+	}
+	// Drain + close the 429 body so we can retry the request.
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	c.limiter.OnRateLimit()
+	wait := cliutil.RetryAfter(resp)
+	time.Sleep(wait)
+	// Single retry. Clone the request to reset the body reader (if any)
+	// and avoid mutating the caller's req.
+	clonedReq := req.Clone(req.Context())
+	if req.Body != nil && req.GetBody != nil {
+		newBody, gerr := req.GetBody()
+		if gerr == nil {
+			clonedReq.Body = newBody
+		}
+	}
+	c.limiter.Wait()
+	resp2, err := c.http.Do(clonedReq)
+	if err != nil {
+		return nil, err
+	}
+	if resp2.StatusCode != http.StatusTooManyRequests {
+		c.limiter.OnSuccess()
+		return resp2, nil
+	}
+	// Retry also rate-limited. Surface the typed error so the caller
+	// can distinguish "throttled" from "no results".
+	body2, _ := io.ReadAll(resp2.Body)
+	resp2.Body.Close()
+	c.limiter.OnRateLimit()
+	return nil, &cliutil.RateLimitError{
+		URL:        req.URL.String(),
+		RetryAfter: cliutil.RetryAfter(resp2),
+		Body:       string(body2) + " (initial body: " + string(body) + ")",
+	}
 }
 
 // LoggedIn reports whether the client is configured with an OpenTable
@@ -109,7 +170,7 @@ func (c *Client) Bootstrap(ctx context.Context) error {
 		return fmt.Errorf("building bootstrap request: %w", err)
 	}
 	req.Header.Set("Accept", "text/html,application/xhtml+xml")
-	resp, err := c.http.Do(req)
+	resp, err := c.do429Aware(req)
 	if err != nil {
 		return fmt.Errorf("fetching opentable.com: %w", err)
 	}
@@ -234,7 +295,7 @@ func (c *Client) gqlCall(ctx context.Context, opname string, body any) ([]byte, 
 	req.Header.Set("X-CSRF-Token", c.CSRF())
 	req.Header.Set("Origin", Origin)
 	req.Header.Set("Referer", Origin+"/")
-	resp, err := c.http.Do(req)
+	resp, err := c.do429Aware(req)
 	if err != nil {
 		return nil, fmt.Errorf("calling %s: %w", opname, err)
 	}

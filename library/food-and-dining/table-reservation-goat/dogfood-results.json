@@ -80,17 +80,7 @@
     "findings": [
       {
         "package": "source/opentable",
-        "file": "internal/source/opentable/client.go",
-        "reason": "outbound HTTP without rate limiter or typed 429 handling"
-      },
-      {
-        "package": "source/opentable",
         "file": "internal/source/opentable/ssr.go",
-        "reason": "outbound HTTP without rate limiter or typed 429 handling"
-      },
-      {
-        "package": "source/tock",
-        "file": "internal/source/tock/client.go",
         "reason": "outbound HTTP without rate limiter or typed 429 handling"
       }
     ]
@@ -106,6 +96,6 @@
   },
   "issues": [
     "4 dead helper functions found",
-    "3 source client file(s) without rate-limit handling: internal/source/opentable/client.go — outbound HTTP without rate limiter or typed 429 handling; internal/source/opentable/ssr.go — outbound HTTP without rate limiter or typed 429 handling; internal/source/tock/client.go — outbound HTTP without rate limiter or typed 429 handling"
+    "1 source client file(s) without rate-limit handling: internal/source/opentable/ssr.go — outbound HTTP without rate limiter or typed 429 handling"
   ]
 }

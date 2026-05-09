@@ -41,7 +41,7 @@ func (c *Client) FetchInitialState(ctx context.Context, path string) (map[string
 	}
 	req.Header.Set("Accept", "text/html,application/xhtml+xml")
 	req.Header.Set("Referer", Origin+"/")
-	resp, err := c.http.Do(req)
+	resp, err := c.do429Aware(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetching %s: %w", path, err)
 	}
