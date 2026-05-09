@@ -30,6 +30,12 @@ type earliestRow struct {
 	URL       string  `json:"url,omitempty"`
 	Latitude  float64 `json:"latitude,omitempty"`
 	Longitude float64 `json:"longitude,omitempty"`
+
+	// BookableTimes lists every confirmed-open (date, time) pair found in
+	// the search window for the requested party size. Empty when no slots
+	// fit; one entry when only one slot fits; many entries when the venue
+	// has broad availability. Format: "YYYY-MM-DDTHH:MM".
+	BookableTimes []string `json:"bookable_times,omitempty"`
 }
 
 type earliestResponse struct {
@@ -184,58 +190,66 @@ func resolveEarliestForVenue(ctx context.Context, s *auth.Session, venue string,
 	// both networks; preferring Tock means the user gets a real
 	// `Available=true|false` answer rather than the OT-side honest no-op.
 	if tryTock {
-		// Tock's VenueAvailability is single-date; iterate from `date`
-		// through `date + within - 1` so a `--within 14d` query actually
-		// scans 14 days. Without this loop the Tock branch silently
-		// queried only `date` and reported `Available=false` for any
-		// venue whose only openings fall on day 2..N — the same pollOneWatch
-		// bug, replicated in resolveEarliestForVenue.
+		// Tock's runtime availability XHR is POST /api/consumer/calendar/full/v2.
+		// One call returns ~60 days of slot data including availableTickets,
+		// minPurchaseSize, and maxPurchaseSize — exactly the per-(date, party,
+		// time) sold-out state we need. Filter client-side to the requested
+		// window and party.
 		c, err := tock.New(s)
 		if err == nil {
-			start, perr := time.Parse("2006-01-02", date)
-			if perr != nil {
-				start = time.Now()
-			}
-			scanned := 0
-			matchedDate := ""
-			matchedCount := 0
-			for d := 0; d < within; d++ {
-				dayStr := start.AddDate(0, 0, d).Format("2006-01-02")
-				detail, derr := c.VenueAvailability(ctx, slug, dayStr, party, "")
-				if derr != nil {
-					if scanned == 0 {
-						// remember the first error so we can surface it if
-						// every day errors
-						row.Reason = fmt.Sprintf("tock %s: %v", slug, derr)
-					}
-					continue
-				}
-				scanned++
-				if cal, ok := detail["calendar"].(map[string]any); ok {
-					if offerings, ok := cal["offerings"].(map[string]any); ok {
-						if exp, ok := offerings["experience"].([]any); ok && len(exp) > 0 {
-							matchedDate = dayStr
-							matchedCount = len(exp)
-							break
-						}
-					}
-				}
-			}
-			if scanned > 0 {
+			cal, calErr := c.Calendar(ctx, slug)
+			if calErr == nil && cal != nil {
 				row.Network = "tock"
 				row.URL = tock.Origin + "/" + slug
-				if matchedDate != "" {
+				start, perr := time.Parse("2006-01-02", date)
+				if perr != nil {
+					start = time.Now()
+				}
+				dateFrom := start.Format("2006-01-02")
+				dateTo := start.AddDate(0, 0, within-1).Format("2006-01-02")
+				seen := map[string]bool{}
+				bookable := []string{}
+				for _, sl := range cal.Slots {
+					if sl.Date < dateFrom || sl.Date > dateTo {
+						continue
+					}
+					if sl.MinPurchaseSize > 0 && int32(party) < sl.MinPurchaseSize {
+						continue
+					}
+					if sl.MaxPurchaseSize > 0 && int32(party) > sl.MaxPurchaseSize {
+						continue
+					}
+					if sl.AvailableTickets < int32(party) {
+						continue
+					}
+					ts := sl.Date + "T" + sl.Time
+					// Dedupe: a single (date, time) may appear in multiple
+					// TicketGroup buckets (one per ticket type / seating area).
+					// Users want the times, not the bucket count.
+					if seen[ts] {
+						continue
+					}
+					seen[ts] = true
+					bookable = append(bookable, ts)
+				}
+				sort.Strings(bookable)
+				if len(bookable) > 0 {
 					row.Available = true
-					row.SlotAt = matchedDate
-					row.Reason = fmt.Sprintf("tock: %d experience offerings on %s (within %dd window)", matchedCount, matchedDate, within)
+					row.SlotAt = bookable[0]
+					row.BookableTimes = bookable
+					row.Reason = fmt.Sprintf("tock %s: %d open slot(s) for party=%d in %d-day window; earliest %s",
+						slug, len(bookable), party, within, bookable[0])
 				} else {
 					row.Available = false
-					row.Reason = fmt.Sprintf("tock: no offerings in %d-day window from %s", within, start.Format("2006-01-02"))
+					row.Reason = fmt.Sprintf("tock %s: no open slots for party=%d between %s and %s (calendar reports %d total slots; none match party-size + availability)",
+						slug, party, dateFrom, dateTo, len(cal.Slots))
 				}
 				return row
 			}
-			// All days errored — fall through to OT branch with row.Reason
-			// preserving the first error encountered.
+			if calErr != nil {
+				row.Reason = fmt.Sprintf("tock %s: %v", slug, calErr)
+				// Fall through to OT branch.
+			}
 		}
 	}
 	if tryOT {

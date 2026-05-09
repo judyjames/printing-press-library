@@ -169,16 +169,16 @@ func (c *Client) BusinessByID(ctx context.Context, id int) (*Business, error) {
 
 // Patron is a slim view over Tock's /api/patron response.
 type Patron struct {
-	ID                int    `json:"id"`
-	Email             string `json:"email"`
-	FirstName         string `json:"firstName,omitempty"`
-	LastName          string `json:"lastName,omitempty"`
-	Phone             string `json:"phone,omitempty"`
-	ZipCode           string `json:"zipCode,omitempty"`
-	Status            string `json:"status,omitempty"`
-	UUID              string `json:"uuid,omitempty"`
-	IsoCountryCode    string `json:"isoCountryCode,omitempty"`
-	PhoneCountryCode  string `json:"phoneCountryCode,omitempty"`
+	ID               int    `json:"id"`
+	Email            string `json:"email"`
+	FirstName        string `json:"firstName,omitempty"`
+	LastName         string `json:"lastName,omitempty"`
+	Phone            string `json:"phone,omitempty"`
+	ZipCode          string `json:"zipCode,omitempty"`
+	Status           string `json:"status,omitempty"`
+	UUID             string `json:"uuid,omitempty"`
+	IsoCountryCode   string `json:"isoCountryCode,omitempty"`
+	PhoneCountryCode string `json:"phoneCountryCode,omitempty"`
 }
 
 // CurrentPatron returns the authenticated user's Tock profile. Returns
@@ -247,18 +247,24 @@ func (c *Client) FetchReduxState(ctx context.Context, path string) (map[string]a
 	if err != nil {
 		return nil, fmt.Errorf("reading tock %s body: %w", path, err)
 	}
-	// Primary path: goja-based JS evaluation. Tock's $REDUX_STATE is JS-shaped
-	// (`undefined`, function expressions, occasional regex literals) so pure
-	// JSON parsing rejects most live responses. goja evaluates the assignment
-	// in a sandbox and JSON.stringify drops the JS-only constructs.
+	state, err := parseReduxStateBody(body)
+	if err != nil {
+		return nil, fmt.Errorf("tock %s: %w", path, err)
+	}
+	return state, nil
+}
+
+// parseReduxStateBody extracts and parses the SSR-emitted $REDUX_STATE assignment
+// from a Tock HTML body. Primary path uses goja (Tock's state contains JS-only
+// constructs like `undefined` and function expressions); regex+strip is a
+// fallback for builds where goja's stringify trips JSON.
+func parseReduxStateBody(body []byte) (map[string]any, error) {
 	jsonBody, err := jseval.ExtractObjectLiteral(body, reduxStateAnchor)
 	if err != nil {
-		return nil, fmt.Errorf("tock: $REDUX_STATE not found in %s (%w)", path, err)
+		return nil, fmt.Errorf("$REDUX_STATE not found: %w", err)
 	}
 	var state map[string]any
 	if err := json.Unmarshal(jsonBody, &state); err != nil {
-		// Fallback: legacy regex+strip path for the corner case where goja's
-		// output trips json.Unmarshal in a way the strip path doesn't.
 		legacy, lerr := extractReduxState(body)
 		if lerr == nil {
 			cleaned := stripJSUndefined(legacy)
@@ -266,7 +272,7 @@ func (c *Client) FetchReduxState(ctx context.Context, path string) (map[string]a
 				return state, nil
 			}
 		}
-		return nil, fmt.Errorf("parsing tock $REDUX_STATE from %s: %w", path, err)
+		return nil, fmt.Errorf("parsing $REDUX_STATE: %w", err)
 	}
 	return state, nil
 }

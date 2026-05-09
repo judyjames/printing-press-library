@@ -292,46 +292,51 @@ func pollOneWatch(ctx context.Context, s *auth.Session, id, venue, network, slug
 	tryOT := network == "auto" || network == "opentable"
 	tryTock := network == "auto" || network == "tock"
 	if tryTock {
-		// Match the OT branch's 7-day forward horizon. Tock's
-		// VenueAvailability is single-day, so we walk 7 dates and stop
-		// as soon as we see an offering. Without this, a watch added
-		// for "next Saturday" never matches because we'd only ever
-		// query today and report "no offerings" forever.
+		// Tock's runtime XHR `/api/consumer/calendar/full/v2` returns ~60
+		// days of per-(date, party, time) sold-out state in a single
+		// protobuf payload. One call per tick beats the previous per-day
+		// SSR walk and produces a real HasMatch instead of "venue exists
+		// and has experiences".
 		c, err := tock.New(s)
 		if err == nil {
 			r.Network = "tock"
-			today := time.Now()
-			matchedDate := ""
-			matchedCount := 0
-			daysScanned := 0
-			for d := 0; d < 7; d++ {
-				date := today.AddDate(0, 0, d).Format("2006-01-02")
-				detail, derr := c.VenueAvailability(ctx, slug, date, party, "")
-				if derr != nil {
-					continue
-				}
-				daysScanned++
-				if cal, ok := detail["calendar"].(map[string]any); ok {
-					if offerings, ok := cal["offerings"].(map[string]any); ok {
-						if exp, ok := offerings["experience"].([]any); ok && len(exp) > 0 {
-							matchedDate = date
-							matchedCount = len(exp)
-							break
-						}
+			cal, calErr := c.Calendar(ctx, slug)
+			if calErr == nil && cal != nil {
+				today := time.Now()
+				dateFrom := today.Format("2006-01-02")
+				dateTo := today.AddDate(0, 0, 6).Format("2006-01-02")
+				openSlot := ""
+				for _, sl := range cal.Slots {
+					if sl.Date < dateFrom || sl.Date > dateTo {
+						continue
+					}
+					if sl.MinPurchaseSize > 0 && int32(party) < sl.MinPurchaseSize {
+						continue
+					}
+					if sl.MaxPurchaseSize > 0 && int32(party) > sl.MaxPurchaseSize {
+						continue
+					}
+					if sl.AvailableTickets < int32(party) {
+						continue
+					}
+					ts := sl.Date + "T" + sl.Time
+					if openSlot == "" || ts < openSlot {
+						openSlot = ts
 					}
 				}
-			}
-			if daysScanned > 0 {
 				r.Polled = true
-				if matchedDate != "" {
+				if openSlot != "" {
 					r.HasMatch = true
-					r.Reason = fmt.Sprintf("tock: %d offerings on %s (within 7d window)", matchedCount, matchedDate)
+					r.Reason = fmt.Sprintf("tock %s: open slot for party=%d at %s (7-day horizon)", slug, party, openSlot)
 				} else {
-					r.Reason = fmt.Sprintf("tock: no offerings in 7-day window from %s", today.Format("2006-01-02"))
+					r.Reason = fmt.Sprintf("tock %s: no open slots for party=%d in 7-day window from %s", slug, party, dateFrom)
 				}
 				return r
 			}
-			// All days errored — fall through to OT path; do NOT mark Polled.
+			if calErr != nil {
+				r.Reason = fmt.Sprintf("tock %s: %v", slug, calErr)
+				// Fall through to OT path; do NOT mark Polled.
+			}
 		}
 	}
 	if tryOT && !r.Polled {
