@@ -54,6 +54,7 @@ func newGoatCmd(flags *rootFlags) *cobra.Command {
 	var (
 		latitude  float64
 		longitude float64
+		metro     string
 		network   string
 		limit     int
 		party     int
@@ -63,7 +64,7 @@ func newGoatCmd(flags *rootFlags) *cobra.Command {
 		Use:     "goat <query>",
 		Short:   "Cross-network unified restaurant search (OpenTable + Tock)",
 		Long:    "Search OpenTable and Tock simultaneously and return one ranked list. Use this any time an agent or user needs a restaurant search that crosses both reservation networks.",
-		Example: "  table-reservation-goat-pp-cli goat 'omakase manhattan' --party 2 --agent",
+		Example: "  table-reservation-goat-pp-cli goat 'omakase' --metro seattle --party 6 --agent",
 		Annotations: map[string]string{
 			"mcp:read-only": "true",
 		},
@@ -73,6 +74,18 @@ func newGoatCmd(flags *rootFlags) *cobra.Command {
 				return cmd.Help()
 			}
 			query := strings.Join(args, " ")
+			// `--metro <slug>` resolves to lat/lng for autocomplete unless
+			// explicit lat/lng is provided. Without this, queries without
+			// geo defaulted to NYC midtown (40.7589, -73.9851) — so
+			// `goat 'tasting menu' --metro seattle` previously returned
+			// New York results.
+			if metro != "" && latitude == 0 && longitude == 0 {
+				if lat, lng, ok := metroLatLng(metro); ok {
+					latitude, longitude = lat, lng
+				} else {
+					return fmt.Errorf("unknown metro %q (known: %s)", metro, strings.Join(knownMetros(), ", "))
+				}
+			}
 			if dryRunOK(flags) {
 				return printJSONFiltered(cmd.OutOrStdout(), goatResponse{
 					Query: query,
@@ -131,8 +144,9 @@ func newGoatCmd(flags *rootFlags) *cobra.Command {
 			return printJSONFiltered(cmd.OutOrStdout(), out, flags)
 		},
 	}
-	cmd.Flags().Float64Var(&latitude, "latitude", 0, "Geo-narrowed search latitude (defaults to 40.7589 / NYC)")
-	cmd.Flags().Float64Var(&longitude, "longitude", 0, "Geo-narrowed search longitude (defaults to -73.9851 / NYC)")
+	cmd.Flags().Float64Var(&latitude, "latitude", 0, "Geo-narrowed search latitude (defaults to NYC unless --metro is set)")
+	cmd.Flags().Float64Var(&longitude, "longitude", 0, "Geo-narrowed search longitude (defaults to NYC unless --metro is set)")
+	cmd.Flags().StringVar(&metro, "metro", "", "Metro slug (seattle, chicago, new-york, san-francisco, los-angeles, ...) — sets lat/lng for autocomplete")
 	cmd.Flags().StringVar(&network, "network", "", "Restrict to one network (opentable, tock); default queries both")
 	cmd.Flags().IntVar(&limit, "limit", 20, "Max merged results to return")
 	cmd.Flags().IntVar(&party, "party", 2, "Party size (informational; OT autocomplete does not filter on this)")
@@ -140,6 +154,64 @@ func newGoatCmd(flags *rootFlags) *cobra.Command {
 	_ = party
 	_ = when
 	return cmd
+}
+
+// metroLatLng resolves a known metro slug to a representative lat/lng for
+// the OpenTable Autocomplete geo-narrowing. Returns ok=false on unknown
+// slugs so the caller can return a clear error.
+func metroLatLng(slug string) (lat, lng float64, ok bool) {
+	switch strings.ToLower(strings.TrimSpace(slug)) {
+	case "seattle":
+		return 47.6062, -122.3321, true
+	case "chicago":
+		return 41.8781, -87.6298, true
+	case "new-york", "new-york-city", "nyc", "manhattan":
+		return 40.7589, -73.9851, true
+	case "san-francisco", "sf":
+		return 37.7749, -122.4194, true
+	case "los-angeles", "la":
+		return 34.0522, -118.2437, true
+	case "miami":
+		return 25.7617, -80.1918, true
+	case "boston":
+		return 42.3601, -71.0589, true
+	case "washington-dc", "dc", "washington":
+		return 38.9072, -77.0369, true
+	case "austin":
+		return 30.2672, -97.7431, true
+	case "portland":
+		return 45.5152, -122.6784, true
+	case "denver":
+		return 39.7392, -104.9903, true
+	case "philadelphia", "philly":
+		return 39.9526, -75.1652, true
+	case "atlanta":
+		return 33.7490, -84.3880, true
+	case "houston":
+		return 29.7604, -95.3698, true
+	case "dallas":
+		return 32.7767, -96.7970, true
+	case "san-diego":
+		return 32.7157, -117.1611, true
+	case "minneapolis":
+		return 44.9778, -93.2650, true
+	case "nashville":
+		return 36.1627, -86.7816, true
+	case "new-orleans", "nola":
+		return 29.9511, -90.0715, true
+	case "las-vegas", "vegas":
+		return 36.1699, -115.1398, true
+	}
+	return 0, 0, false
+}
+
+func knownMetros() []string {
+	return []string{
+		"seattle", "chicago", "new-york", "san-francisco", "los-angeles",
+		"miami", "boston", "washington-dc", "austin", "portland", "denver",
+		"philadelphia", "atlanta", "houston", "dallas", "san-diego",
+		"minneapolis", "nashville", "new-orleans", "las-vegas",
+	}
 }
 
 func goatQueryOpenTable(ctx context.Context, s *auth.Session, query string, lat, lng float64) ([]goatResult, error) {

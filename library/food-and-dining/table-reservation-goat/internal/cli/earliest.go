@@ -47,9 +47,10 @@ type earliestResponse struct {
 // network:slug prefix) and queries the right source.
 func newEarliestCmd(flags *rootFlags) *cobra.Command {
 	var (
-		party  int
-		within string
-		date   string
+		party   int
+		within  string
+		date    string
+		tonight bool
 	)
 	cmd := &cobra.Command{
 		Use:   "earliest <slug1,slug2,...>",
@@ -57,8 +58,9 @@ func newEarliestCmd(flags *rootFlags) *cobra.Command {
 		Long: "Across a comma-separated list of restaurant slugs, return the " +
 			"earliest open slot per venue within `--within N days`. Slugs may be " +
 			"network-prefixed (`opentable:le-bernardin`, `tock:alinea`) for " +
-			"explicit routing, otherwise both networks are tried.",
-		Example: "  table-reservation-goat-pp-cli earliest 'le-bernardin,atomix,alinea' --party 2 --within 14d --agent",
+			"explicit routing, otherwise both networks are tried. Use `--tonight` " +
+			"as shorthand for `--date <today> --within 1d`.",
+		Example: "  table-reservation-goat-pp-cli earliest 'canlis,spinasse,altura' --party 6 --tonight --agent",
 		Annotations: map[string]string{
 			"mcp:read-only": "true",
 		},
@@ -69,6 +71,15 @@ func newEarliestCmd(flags *rootFlags) *cobra.Command {
 			venues := splitCSV(args[0])
 			if len(venues) == 0 {
 				return fmt.Errorf("provide a comma-separated list of restaurant slugs")
+			}
+			// `--tonight` is shorthand for "today only." Mutually exclusive
+			// with `--date` and overrides `--within`.
+			if tonight {
+				if date != "" {
+					return fmt.Errorf("--tonight and --date are mutually exclusive")
+				}
+				date = time.Now().Format("2006-01-02")
+				within = "1d"
 			}
 			withinDays := parseDays(within)
 			if withinDays == 0 {
@@ -117,6 +128,7 @@ func newEarliestCmd(flags *rootFlags) *cobra.Command {
 	cmd.Flags().IntVar(&party, "party", 2, "Party size")
 	cmd.Flags().StringVar(&within, "within", "14d", "Search horizon (e.g., '14d', '7d', '30d' or a bare integer of days)")
 	cmd.Flags().StringVar(&date, "date", "", "Start date YYYY-MM-DD (defaults to today)")
+	cmd.Flags().BoolVar(&tonight, "tonight", false, "Shorthand for --date <today> --within 1d. Mutually exclusive with --date.")
 	return cmd
 }
 

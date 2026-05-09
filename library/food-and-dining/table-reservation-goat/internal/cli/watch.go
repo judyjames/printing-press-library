@@ -292,26 +292,46 @@ func pollOneWatch(ctx context.Context, s *auth.Session, id, venue, network, slug
 	tryOT := network == "auto" || network == "opentable"
 	tryTock := network == "auto" || network == "tock"
 	if tryTock {
+		// Match the OT branch's 7-day forward horizon. Tock's
+		// VenueAvailability is single-day, so we walk 7 dates and stop
+		// as soon as we see an offering. Without this, a watch added
+		// for "next Saturday" never matches because we'd only ever
+		// query today and report "no offerings" forever.
 		c, err := tock.New(s)
 		if err == nil {
-			detail, err := c.VenueAvailability(ctx, slug, time.Now().Format("2006-01-02"), party, "")
-			if err == nil {
-				r.Polled = true
+			r.Network = "tock"
+			today := time.Now()
+			matchedDate := ""
+			matchedCount := 0
+			daysScanned := 0
+			for d := 0; d < 7; d++ {
+				date := today.AddDate(0, 0, d).Format("2006-01-02")
+				detail, derr := c.VenueAvailability(ctx, slug, date, party, "")
+				if derr != nil {
+					continue
+				}
+				daysScanned++
 				if cal, ok := detail["calendar"].(map[string]any); ok {
 					if offerings, ok := cal["offerings"].(map[string]any); ok {
 						if exp, ok := offerings["experience"].([]any); ok && len(exp) > 0 {
-							r.HasMatch = true
-							r.Reason = fmt.Sprintf("tock: %d offerings", len(exp))
-							r.Network = "tock"
-							return r
+							matchedDate = date
+							matchedCount = len(exp)
+							break
 						}
 					}
 				}
-				if r.Reason == "" {
-					r.Reason = "tock: no offerings"
-					r.Network = "tock"
-				}
 			}
+			if daysScanned > 0 {
+				r.Polled = true
+				if matchedDate != "" {
+					r.HasMatch = true
+					r.Reason = fmt.Sprintf("tock: %d offerings on %s (within 7d window)", matchedCount, matchedDate)
+				} else {
+					r.Reason = fmt.Sprintf("tock: no offerings in 7-day window from %s", today.Format("2006-01-02"))
+				}
+				return r
+			}
+			// All days errored — fall through to OT path; do NOT mark Polled.
 		}
 	}
 	if tryOT && !r.Polled {

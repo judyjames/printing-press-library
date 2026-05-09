@@ -40,6 +40,15 @@ func NewAdaptiveLimiter(ratePerSec float64) *AdaptiveLimiter {
 	}
 }
 
+// PATCH: ratelimit-toctou-fix — see .printing-press-patches.json. The original
+// generator-emitted Wait() had a TOCTOU race: read lastRequest under lock,
+// release, sleep, then re-acquire to write. Two concurrent callers would
+// both observe the same stale lastRequest, both sleep the same duration,
+// and both update lastRequest to ~the same value — defeating rate limiting
+// for the second caller. Fix: under a single lock, compute the deadline,
+// stamp lastRequest forward to that deadline, then sleep without the lock
+// held. The next caller acquiring the lock sees lastRequest in the future
+// and queues serially behind us.
 func (l *AdaptiveLimiter) Wait() {
 	if l == nil {
 		return
@@ -47,13 +56,18 @@ func (l *AdaptiveLimiter) Wait() {
 	l.mu.Lock()
 	delay := time.Duration(float64(time.Second) / l.rate)
 	elapsed := time.Since(l.lastRequest)
-	l.mu.Unlock()
+	var sleep time.Duration
 	if elapsed < delay {
-		time.Sleep(delay - elapsed)
+		sleep = delay - elapsed
 	}
-	l.mu.Lock()
-	l.lastRequest = time.Now()
+	// Stamp lastRequest forward to the deadline BEFORE releasing the lock,
+	// so a second caller arriving while we sleep computes its own delay
+	// relative to our deadline rather than our (now stale) start time.
+	l.lastRequest = time.Now().Add(sleep)
 	l.mu.Unlock()
+	if sleep > 0 {
+		time.Sleep(sleep)
+	}
 }
 
 func (l *AdaptiveLimiter) OnSuccess() {
