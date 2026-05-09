@@ -64,6 +64,16 @@
         ".printing-press.json"
       ],
       "validated_outcome": "HAR-derived media entity binding is covered by focused unit tests for placeholder parsing and uploaded media replacement."
+    },
+    {
+      "id": "client-v4-2-2-parity",
+      "summary": "Backport Printing Press 4.2.2 client cache and Surf transport fixes into the X-customized client.",
+      "reason": "regen-merge reported body drift in internal/client/client.go because X adds cookie auth and absolute-host routing. The upstream template fixes therefore need surgical application instead of a blind generated overwrite.",
+      "files": [
+        "internal/client/client.go",
+        "internal/client/client_test.go"
+      ],
+      "validated_outcome": "Focused client tests cover auth-scoped cache keys and stable query parameter ordering."
     }
   ]
 }
