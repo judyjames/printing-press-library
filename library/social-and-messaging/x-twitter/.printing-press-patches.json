@@ -52,6 +52,18 @@
         ".printing-press.json"
       ],
       "validated_outcome": "Live CLI run updated and republished Article 2053246975311503364 with MARKDOWN code blocks and cover media 2053253930239266817."
+    },
+    {
+      "id": "articles-body-images",
+      "summary": "Convert markdown image lines to X Articles MEDIA atomic entities.",
+      "reason": "A browser edit HAR showed body images are Draft.js atomic MEDIA entities backed by upload.x.com media IDs, distinct from the Article cover flow.",
+      "files": [
+        "internal/cli/articles_publish_md.go",
+        "internal/cli/articles_publish_md_test.go",
+        "SKILL.md",
+        ".printing-press.json"
+      ],
+      "validated_outcome": "HAR-derived media entity binding is covered by focused unit tests for placeholder parsing and uploaded media replacement."
     }
   ]
 }

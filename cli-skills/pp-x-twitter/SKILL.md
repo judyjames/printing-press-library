@@ -455,11 +455,7 @@ x-twitter-pp-cli thread compose draft.md --post  # (not yet wired — preview on
 
 Parses YAML frontmatter (`title`, `cover`, `tags`, `summary`) and converts the markdown body to Draft.js `content_state` JSON — the format the X Articles editor server-side expects.
 
-Supported in v1: cover image from frontmatter (`cover: ./cover.png`), paragraph, header-one (`#`), header-two (`##`), unordered-list-item (`-`/`*`), ordered-list-item (`1.`), blockquote (`>`), fenced code blocks, inline `**bold**` and `*italic*`.
-
-NOT supported in v1: inline images. The X Articles editor uses Draft.js atomic blocks for embedded content; fenced code blocks are supported through MARKDOWN entities in `entity_map`, while inline images still need their media entity payload shape.
-
-For articles WITH inline images, use the existing `publish-x-article` skill (Playwright/CDP browser automation), which sidesteps the API by pasting HTML into the editor's Cmd+V handler.
+Supported in v1: cover image from frontmatter (`cover: ./cover.png`), body image lines (`![alt](./body.png)`), paragraph, header-one (`#`), header-two (`##`), unordered-list-item (`-`/`*`), ordered-list-item (`1.`), blockquote (`>`), fenced code blocks, inline `**bold**` and `*italic*`.
 
 ```bash
 # Markdown with frontmatter
@@ -474,6 +470,8 @@ tags: [test]
 
 A paragraph with **bold** text.
 
+![Screenshot alt text](./body.png)
+
 - bullet one
 - bullet two
 
@@ -486,7 +484,7 @@ x-twitter-pp-cli articles-publish-md draft.md   # dry-run; prints constructed co
 x-twitter-pp-cli articles-publish-md draft.md --post  # create, update, set cover, and publish the article
 ```
 
-With `--post`, the command creates a draft, updates the title, updates the text content, uploads and assigns a cover image when `cover` is set, and publishes it as a public X Article using Source B cookie auth and the article-ops.json hash config. The wrapper requires a frontmatter `title`.
+With `--post`, the command creates a draft, updates the title, uploads body images and binds them into the Draft.js `entity_map`, updates the content, uploads and assigns a cover image when `cover` is set, and publishes it as a public X Article using Source B cookie auth and the article-ops.json hash config. The wrapper requires a frontmatter `title`.
 
 **`x-twitter-pp-cli articles set-cover <article-id> <image-file>`**
 
@@ -495,6 +493,4 @@ Uploads a local image through X's browser media-upload flow and assigns the retu
 ### Known limitations of v1
 
 - `thread compose --post` is gated as a dry-run only. Real thread posting is the next engineering step.
-- Inline body images in articles require media entity-binding research not yet completed. Cover images are supported.
-- Cookie capture is manual (DevTools). A `x-twitter-pp-cli auth capture-cookies` helper command is a future addition.
-- Articles operation hash refresh is manual (re-sniff). Auto-refresh on 404 is a future addition.
+- OAuth live acceptance is blocked until the registered callback setup is available.

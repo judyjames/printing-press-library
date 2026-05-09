@@ -3,14 +3,10 @@
 // Parses a markdown file with frontmatter, converts body to Draft.js
 // content_state JSON, and prints the constructed payload in dry-run mode.
 //
-// CURRENT SCOPE: text-only articles. Supported block types:
+// CURRENT SCOPE: article body + media. Supported block types:
 // paragraph, header-one, header-two, unordered-list-item, ordered-list-item,
-// blockquote, fenced code blocks, plus bold/italic inline styles. Cover image via the
-// captured-but-not-yet-orchestrated upload + UpdateCoverMedia flow.
-//
-// NOT YET SUPPORTED: inline images. The X Articles editor uses Draft.js
-// atomic blocks for embedded content. Fenced code blocks are rendered through
-// MARKDOWN entities; inline media still needs its own entity payload shape.
+// blockquote, fenced code blocks, markdown image blocks, plus bold/italic
+// inline styles. Cover image uses the captured upload + UpdateCoverMedia flow.
 
 package cli
 
@@ -74,7 +70,7 @@ func newArticlesPublishMdCmd(flags *rootFlags) *cobra.Command {
 	var post bool
 	cmd := &cobra.Command{
 		Use:     "articles-publish-md <markdown-file>",
-		Short:   "Convert a markdown file to an X Article (text-only v1; dry-run by default)",
+		Short:   "Convert a markdown file to an X Article (dry-run by default)",
 		Long:    "Parses frontmatter (title, cover, tags) and body, converts body to Draft.js content_state JSON, and prints the payload. Pass --post to create and publish the article.",
 		Example: "  x-twitter-pp-cli articles-publish-md draft.md",
 		Args:    cobra.ExactArgs(1),
@@ -171,6 +167,11 @@ func publishMarkdownArticle(flags *rootFlags, title string, coverPath string, co
 		"queryId":   "x75E2ABzm8_mGTg1bz8hcA",
 	}
 	if _, _, err := c.Post(client.ArticleOpURL("ArticleEntityUpdateTitle"), updateTitleBody); err != nil {
+		return nil, classifyAPIError(err, flags)
+	}
+
+	// PATCH: Bind local markdown image placeholders to uploaded X Article MEDIA entities.
+	if err := bindArticleMediaEntities(&contentState, c.UploadArticleImage); err != nil {
 		return nil, classifyAPIError(err, flags)
 	}
 
@@ -341,9 +342,11 @@ func parseFrontmatter(yamlSrc string, fm *articleFrontmatter) {
 
 // MarkdownBodyToDraftJS converts a markdown body to a Draft.js content_state.
 // Supports: paragraph, header-one (# ), header-two (## ), unordered-list-item,
-// ordered-list-item, blockquote, plus inline bold (**...**) and italic (*...*).
-// Fenced code blocks are emitted as X Articles MARKDOWN entities bound to
-// atomic Draft.js blocks.
+// ordered-list-item, blockquote, markdown image lines, plus inline bold
+// (**...**) and italic (*...*). Fenced code blocks are emitted as X Articles
+// MARKDOWN entities bound to atomic Draft.js blocks. Image lines are emitted as
+// placeholder MEDIA entities in dry-run output, then rebound to uploaded media
+// IDs before live publish.
 func MarkdownBodyToDraftJS(md string) draftContentState {
 	cs := draftContentState{}
 	lines := strings.Split(md, "\n")
@@ -365,6 +368,10 @@ func MarkdownBodyToDraftJS(md string) draftContentState {
 				codeLines = append(codeLines, codeLine)
 			}
 			appendMarkdownEntityBlock(&cs, openingFence+"\n"+strings.Join(codeLines, "\n")+"\n```")
+			continue
+		}
+		if alt, path, ok := parseMarkdownImageLine(trim); ok {
+			appendArticleMediaEntityBlock(&cs, path, alt)
 			continue
 		}
 		blk := draftBlock{
@@ -418,6 +425,79 @@ func appendMarkdownEntityBlock(cs *draftContentState, markdown string) {
 		EntityRanges:      []map[string]any{{"key": entityIndex, "offset": 0, "length": 1}},
 		InlineStyleRanges: []inlineStyle{},
 	})
+}
+
+func appendArticleMediaEntityBlock(cs *draftContentState, sourcePath string, altText string) {
+	entityIndex := len(cs.EntityMap)
+	data := map[string]any{"source_path": sourcePath}
+	if altText != "" {
+		data["alt_text"] = altText
+	}
+	cs.EntityMap = append(cs.EntityMap, draftEntity{
+		Key: strconv.Itoa(entityIndex),
+		Value: draftEntityValue{
+			Data:       data,
+			Type:       "MEDIA",
+			Mutability: "Immutable",
+		},
+	})
+	cs.Blocks = append(cs.Blocks, draftBlock{
+		Data:              map[string]any{},
+		Text:              " ",
+		Key:               randBlockKey(),
+		Type:              "atomic",
+		EntityRanges:      []map[string]any{{"key": entityIndex, "offset": 0, "length": 1}},
+		InlineStyleRanges: []inlineStyle{},
+	})
+}
+
+func bindArticleMediaEntities(cs *draftContentState, upload func(string) (string, error)) error {
+	imageIndex := 0
+	for i := range cs.EntityMap {
+		entity := &cs.EntityMap[i].Value
+		if entity.Type != "MEDIA" {
+			continue
+		}
+		sourcePath, _ := entity.Data["source_path"].(string)
+		if strings.TrimSpace(sourcePath) == "" {
+			continue
+		}
+		mediaID, err := upload(sourcePath)
+		if err != nil {
+			return fmt.Errorf("upload article body image %s: %w", sourcePath, err)
+		}
+		entity.Data = articleMediaEntityData(mediaID, imageIndex)
+		entity.Type = "MEDIA"
+		entity.Mutability = "Immutable"
+		imageIndex++
+	}
+	return nil
+}
+
+func articleMediaEntityData(mediaID string, imageIndex int) map[string]any {
+	return map[string]any{
+		"media_items": []map[string]any{{
+			"local_media_id": 2 + imageIndex*2,
+			"media_category": "DraftTweetImage",
+			"media_id":       mediaID,
+		}},
+	}
+}
+
+func parseMarkdownImageLine(line string) (string, string, bool) {
+	if !strings.HasPrefix(line, "![") || !strings.HasSuffix(line, ")") {
+		return "", "", false
+	}
+	closeAlt := strings.Index(line, "](")
+	if closeAlt < 2 {
+		return "", "", false
+	}
+	altText := line[2:closeAlt]
+	sourcePath := strings.TrimSpace(line[closeAlt+2 : len(line)-1])
+	if sourcePath == "" || strings.ContainsAny(sourcePath, "\t\n\r") {
+		return "", "", false
+	}
+	return altText, sourcePath, true
 }
 
 // extractInlineStyles scans a string for **bold** and *italic* markers and
