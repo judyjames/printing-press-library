@@ -3,17 +3,14 @@
 // Parses a markdown file with frontmatter, converts body to Draft.js
 // content_state JSON, and prints the constructed payload in dry-run mode.
 //
-// CURRENT SCOPE (v1, 2026-05-08): text-only articles. Supported block types:
+// CURRENT SCOPE: text-only articles. Supported block types:
 // paragraph, header-one, header-two, unordered-list-item, ordered-list-item,
-// blockquote, plus bold/italic inline styles. Cover image via the
+// blockquote, fenced code blocks, plus bold/italic inline styles. Cover image via the
 // captured-but-not-yet-orchestrated upload + UpdateCoverMedia flow.
 //
-// NOT YET SUPPORTED: inline images, code blocks. The X Articles editor
-// uses Draft.js atomic blocks for these but the entityMap binding mechanism
-// is unclear from the captured HARs — it appears the entity data is
-// attached via a separate API call we haven't sniffed. For articles with
-// inline media, fall back to the user's existing publish-x-article skill
-// (which uses Playwright/CDP browser automation).
+// NOT YET SUPPORTED: inline images. The X Articles editor uses Draft.js
+// atomic blocks for embedded content. Fenced code blocks are rendered through
+// MARKDOWN entities; inline media still needs its own entity payload shape.
 
 package cli
 
@@ -22,6 +19,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"unicode/utf16"
 
@@ -57,8 +55,19 @@ type inlineStyle struct {
 }
 
 type draftContentState struct {
-	Blocks    []draftBlock   `json:"blocks"`
-	EntityMap map[string]any `json:"entityMap"`
+	Blocks    []draftBlock  `json:"blocks"`
+	EntityMap []draftEntity `json:"entityMap"`
+}
+
+type draftEntity struct {
+	Key   string           `json:"key"`
+	Value draftEntityValue `json:"value"`
+}
+
+type draftEntityValue struct {
+	Data       map[string]any `json:"data"`
+	Type       string         `json:"type"`
+	Mutability string         `json:"mutability"`
 }
 
 func newArticlesPublishMdCmd(flags *rootFlags) *cobra.Command {
@@ -106,7 +115,7 @@ func newArticlesPublishMdCmd(flags *rootFlags) *cobra.Command {
 				fmt.Fprintln(cmd.OutOrStdout(), "verify-env: skipping article publish")
 				return nil
 			}
-			result, err := publishMarkdownArticle(flags, parsed.Frontmatter.Title, cs)
+			result, err := publishMarkdownArticle(flags, parsed.Frontmatter.Title, parsed.Frontmatter.Cover, cs)
 			if err != nil {
 				return err
 			}
@@ -122,13 +131,14 @@ func newArticlesPublishMdCmd(flags *rootFlags) *cobra.Command {
 }
 
 type publishedArticleResult struct {
-	ArticleID string `json:"article_id"`
-	URL       string `json:"url"`
-	Title     string `json:"title"`
+	ArticleID    string `json:"article_id"`
+	URL          string `json:"url"`
+	Title        string `json:"title"`
+	CoverMediaID string `json:"cover_media_id,omitempty"`
 }
 
 // PATCH: Wire the X-specific Articles create/update/publish GraphQL sequence.
-func publishMarkdownArticle(flags *rootFlags, title string, contentState draftContentState) (*publishedArticleResult, error) {
+func publishMarkdownArticle(flags *rootFlags, title string, coverPath string, contentState draftContentState) (*publishedArticleResult, error) {
 	if strings.TrimSpace(title) == "" {
 		return nil, fmt.Errorf("frontmatter title is required when --post is set")
 	}
@@ -176,6 +186,28 @@ func publishMarkdownArticle(flags *rootFlags, title string, contentState draftCo
 		return nil, classifyAPIError(err, flags)
 	}
 
+	var coverMediaID string
+	if strings.TrimSpace(coverPath) != "" {
+		coverMediaID, err = c.UploadArticleImage(coverPath)
+		if err != nil {
+			return nil, classifyAPIError(err, flags)
+		}
+		updateCoverBody := map[string]any{
+			"variables": map[string]any{
+				"articleEntityId": articleID,
+				"coverMedia": map[string]any{
+					"media_id":       coverMediaID,
+					"media_category": "DraftTweetImage",
+				},
+			},
+			"features": features,
+			"queryId":  "Es8InPh7mEkK9PxclxFAVQ",
+		}
+		if _, _, err := c.Post(client.ArticleOpURL("ArticleEntityUpdateCoverMedia"), updateCoverBody); err != nil {
+			return nil, classifyAPIError(err, flags)
+		}
+	}
+
 	publishBody := map[string]any{
 		"variables": map[string]any{"articleEntityId": articleID, "visibilitySetting": "Public"},
 		"features":  features,
@@ -190,9 +222,10 @@ func publishMarkdownArticle(flags *rootFlags, title string, contentState draftCo
 	}
 
 	return &publishedArticleResult{
-		ArticleID: articleID,
-		URL:       "https://x.com/i/article/" + articleID,
-		Title:     title,
+		ArticleID:    articleID,
+		URL:          "https://x.com/i/article/" + articleID,
+		Title:        title,
+		CoverMediaID: coverMediaID,
 	}, nil
 }
 
@@ -210,7 +243,7 @@ func articleGraphQLFeatures() map[string]any {
 func articleContentStateRequest(cs draftContentState) map[string]any {
 	return map[string]any{
 		"blocks":     cs.Blocks,
-		"entity_map": []any{},
+		"entity_map": cs.EntityMap,
 	}
 }
 
@@ -309,14 +342,29 @@ func parseFrontmatter(yamlSrc string, fm *articleFrontmatter) {
 // MarkdownBodyToDraftJS converts a markdown body to a Draft.js content_state.
 // Supports: paragraph, header-one (# ), header-two (## ), unordered-list-item,
 // ordered-list-item, blockquote, plus inline bold (**...**) and italic (*...*).
-// Code fences are emitted as paragraphs in v1 (atomic block needs entity binding
-// research that's deferred — see file header).
+// Fenced code blocks are emitted as X Articles MARKDOWN entities bound to
+// atomic Draft.js blocks.
 func MarkdownBodyToDraftJS(md string) draftContentState {
-	cs := draftContentState{EntityMap: map[string]any{}}
-	for _, raw := range strings.Split(md, "\n") {
+	cs := draftContentState{}
+	lines := strings.Split(md, "\n")
+	for i := 0; i < len(lines); i++ {
+		raw := lines[i]
 		line := strings.TrimRight(raw, " \t")
 		trim := strings.TrimSpace(line)
 		if trim == "" {
+			continue
+		}
+		if strings.HasPrefix(trim, "```") {
+			codeLines := []string{}
+			openingFence := trim
+			for i++; i < len(lines); i++ {
+				codeLine := strings.TrimRight(lines[i], " \t")
+				if strings.HasPrefix(strings.TrimSpace(codeLine), "```") {
+					break
+				}
+				codeLines = append(codeLines, codeLine)
+			}
+			appendMarkdownEntityBlock(&cs, openingFence+"\n"+strings.Join(codeLines, "\n")+"\n```")
 			continue
 		}
 		blk := draftBlock{
@@ -350,6 +398,26 @@ func MarkdownBodyToDraftJS(md string) draftContentState {
 		cs.Blocks = append(cs.Blocks, blk)
 	}
 	return cs
+}
+
+func appendMarkdownEntityBlock(cs *draftContentState, markdown string) {
+	entityIndex := len(cs.EntityMap)
+	cs.EntityMap = append(cs.EntityMap, draftEntity{
+		Key: strconv.Itoa(entityIndex),
+		Value: draftEntityValue{
+			Data:       map[string]any{"markdown": markdown},
+			Type:       "MARKDOWN",
+			Mutability: "Mutable",
+		},
+	})
+	cs.Blocks = append(cs.Blocks, draftBlock{
+		Data:              map[string]any{},
+		Text:              " ",
+		Key:               randBlockKey(),
+		Type:              "atomic",
+		EntityRanges:      []map[string]any{{"key": entityIndex, "offset": 0, "length": 1}},
+		InlineStyleRanges: []inlineStyle{},
+	})
 }
 
 // extractInlineStyles scans a string for **bold** and *italic* markers and

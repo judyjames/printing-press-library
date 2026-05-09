@@ -23,6 +23,35 @@
         "SKILL.md"
       ],
       "validated_outcome": "Live smoke test created and published an X Article through articles-publish-md --post using the renamed x-twitter config namespace."
+    },
+    {
+      "id": "articles-markdown-code-blocks",
+      "summary": "Convert fenced markdown code blocks to X Articles MARKDOWN atomic entities.",
+      "reason": "A browser edit HAR showed that X Articles does not render Draft.js code-block blocks; it uses atomic blocks bound to entity_map MARKDOWN entities.",
+      "files": [
+        "internal/cli/articles_publish_md.go",
+        "internal/cli/articles_publish_md_test.go",
+        "SKILL.md"
+      ],
+      "validated_outcome": "HAR-derived payload shape was added to the markdown converter and covered by a focused unit test."
+    },
+    {
+      "id": "articles-edit-and-cover-flow",
+      "summary": "Add published-article edit lifecycle support and local cover image upload.",
+      "reason": "A browser edit HAR showed that changing a published Article requires ArticleEntityUnpublish before UpdateContent and ArticleEntityPublish after. The cover image flow also requires upload.x.com INIT, APPENDMULTI, FINALIZE before ArticleEntityUpdateCoverMedia.",
+      "files": [
+        "internal/client/article_ops.go",
+        "internal/client/article_media_upload.go",
+        "internal/cli/articles.go",
+        "internal/cli/articles_unpublish.go",
+        "internal/cli/articles_set_cover.go",
+        "internal/cli/articles_publish_md.go",
+        "internal/cli/which.go",
+        "SKILL.md",
+        "README.md",
+        ".printing-press.json"
+      ],
+      "validated_outcome": "Live CLI run updated and republished Article 2053246975311503364 with MARKDOWN code blocks and cover media 2053253930239266817."
     }
   ]
 }

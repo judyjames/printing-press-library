@@ -32,7 +32,7 @@
     {
       "name": "Markdown to X Article",
       "command": "articles-publish-md",
-      "description": "Parse a markdown file with YAML frontmatter (title, cover, tags) and convert the body to Draft.js content_state JSON — the format X's Articles editor accepts server-side via ArticleEntityUpdateContent. v1 supports text-only articles (paragraphs, H1/H2, ordered/unordered lists, blockquote, bold, italic)."
+      "description": "Parse a markdown file with YAML frontmatter (title, cover, tags) and convert the body to Draft.js content_state JSON — the format X's Articles editor accepts server-side via ArticleEntityUpdateContent. Supports cover images, paragraphs, H1/H2, ordered/unordered lists, blockquote, fenced code blocks, bold, and italic."
     }
   ]
 }

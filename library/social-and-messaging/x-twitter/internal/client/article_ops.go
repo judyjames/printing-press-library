@@ -37,6 +37,7 @@ var articleOpsDefaults = map[string]string{
 	"ArticleEntityUpdateContent":    "M7N2FrPrlOmu-YrVIBxFnQ",
 	"ArticleEntityUpdateCoverMedia": "Es8InPh7mEkK9PxclxFAVQ",
 	"ArticleEntityPublish":          "m4SHicYMoWO_qkLvjhDk7Q",
+	"ArticleEntityUnpublish":        "WbeMAOZdMHilHrqhgpjObw",
 	"ArticleEntityDelete":           "e4lWqB6m2TA8Fn_j9L9xEA",
 }
 

@@ -1,6 +1,6 @@
 {
-  "dir": "/Users/cathrynlavery/printing-press/.publish-repo-cli-printing-press-23b02465/library/social-and-messaging/x-twitter",
-  "spec_path": "/Users/cathrynlavery/printing-press/.publish-repo-cli-printing-press-23b02465/library/social-and-messaging/x-twitter/spec.yaml",
+  "dir": "library/social-and-messaging/x-twitter",
+  "spec_path": "library/social-and-messaging/x-twitter/spec.yaml",
   "verdict": "PASS",
   "path_check": {
     "tested": 8,
@@ -40,8 +40,8 @@
   },
   "wiring_check": {
     "command_tree": {
-      "defined": 245,
-      "registered": 245
+      "defined": 247,
+      "registered": 247
     },
     "config_consistency": {
       "consistent": true
@@ -73,13 +73,13 @@
     "skipped": true
   },
   "print_json_filtered_check": {
-    "checked": 233
+    "checked": 235
   },
   "test_presence": {
     "checked": 0
   },
   "naming_check": {
-    "checked": 233
+    "checked": 235
   },
   "issues": null
 }

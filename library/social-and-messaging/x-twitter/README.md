@@ -125,6 +125,8 @@ X Articles (long-form posts) authoring + media upload
 - **`x-twitter-pp-cli articles delete`** - POST /i/api/graphql/e4lWqB6m2TA8Fn_j9L9xEA/ArticleEntityDelete
 - **`x-twitter-pp-cli articles list`** - GET /i/api/graphql/N1zzFzRPspT-sP9Q42n_bg/ArticleEntitiesSlice
 - **`x-twitter-pp-cli articles publish`** - POST /i/api/graphql/m4SHicYMoWO_qkLvjhDk7Q/ArticleEntityPublish
+- **`x-twitter-pp-cli articles set-cover`** - Upload an image and set it as an X Article cover
+- **`x-twitter-pp-cli articles unpublish`** - POST /i/api/graphql/WbeMAOZdMHilHrqhgpjObw/ArticleEntityUnpublish
 - **`x-twitter-pp-cli articles update_content`** - POST /i/api/graphql/M7N2FrPrlOmu-YrVIBxFnQ/ArticleEntityUpdateContent
 - **`x-twitter-pp-cli articles update_cover_media`** - POST /i/api/graphql/Es8InPh7mEkK9PxclxFAVQ/ArticleEntityUpdateCoverMedia
 - **`x-twitter-pp-cli articles update_title`** - POST /i/api/graphql/x75E2ABzm8_mGTg1bz8hcA/ArticleEntityUpdateTitle

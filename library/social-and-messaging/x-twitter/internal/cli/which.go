@@ -42,6 +42,8 @@ var whichIndex = []whichEntry{
 	{Command: "articles delete", Description: "POST /i/api/graphql/e4lWqB6m2TA8Fn_j9L9xEA/ArticleEntityDelete", Group: "articles"},
 	{Command: "articles list", Description: "GET /i/api/graphql/N1zzFzRPspT-sP9Q42n_bg/ArticleEntitiesSlice", Group: "articles"},
 	{Command: "articles publish", Description: "POST /i/api/graphql/m4SHicYMoWO_qkLvjhDk7Q/ArticleEntityPublish", Group: "articles"},
+	{Command: "articles set-cover", Description: "Upload an image and set it as an X Article cover", Group: "articles"},
+	{Command: "articles unpublish", Description: "POST /i/api/graphql/WbeMAOZdMHilHrqhgpjObw/ArticleEntityUnpublish", Group: "articles"},
 	{Command: "articles update_content", Description: "POST /i/api/graphql/M7N2FrPrlOmu-YrVIBxFnQ/ArticleEntityUpdateContent", Group: "articles"},
 	{Command: "articles update_cover_media", Description: "POST /i/api/graphql/Es8InPh7mEkK9PxclxFAVQ/ArticleEntityUpdateCoverMedia", Group: "articles"},
 	{Command: "articles update_title", Description: "POST /i/api/graphql/x75E2ABzm8_mGTg1bz8hcA/ArticleEntityUpdateTitle", Group: "articles"},

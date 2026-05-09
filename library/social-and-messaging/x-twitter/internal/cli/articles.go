@@ -17,6 +17,8 @@ func newArticlesCmd(flags *rootFlags) *cobra.Command {
 	cmd.AddCommand(newArticlesDeleteCmd(flags))
 	cmd.AddCommand(newArticlesListCmd(flags))
 	cmd.AddCommand(newArticlesPublishCmd(flags))
+	cmd.AddCommand(newArticlesSetCoverCmd(flags))
+	cmd.AddCommand(newArticlesUnpublishCmd(flags))
 	cmd.AddCommand(newArticlesUpdateContentCmd(flags))
 	cmd.AddCommand(newArticlesUpdateCoverMediaCmd(flags))
 	cmd.AddCommand(newArticlesUpdateTitleCmd(flags))
