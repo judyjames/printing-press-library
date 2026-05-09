@@ -44,6 +44,16 @@ const (
 	// client re-fetches the homepage and bootstraps a fresh hash.
 	AutocompleteHash = "fe1d118abd4c227750693027c2414d43014c2493f64f49bcef5a65274ce9c3c3"
 
+	// RestaurantsAvailabilityHash is the persisted-query hash for
+	// `RestaurantsAvailability` cited by 21Bruce/resolved-bot's Go client
+	// (`FindKey`). The same hash appears across multiple community wrappers
+	// as the working hash; it drifts on bundle releases but a working hash
+	// is always discoverable. v1 caches this value; on a
+	// PersistedQueryNotFound (400) error, the client surfaces a clear hint
+	// that the user should run `doctor --refresh-hashes` (a v0.2 escape
+	// hatch).
+	RestaurantsAvailabilityHash = "e6b87021ed6e865a7778aa39d35d09864c1be29c683c707602dd3de43c854d86"
+
 	defaultTimeout = 30 * time.Second
 )
 
@@ -295,6 +305,146 @@ func (c *Client) Autocomplete(ctx context.Context, term string, lat, lng float64
 		return nil, fmt.Errorf("parsing Autocomplete response: %w", err)
 	}
 	return r.Data.Autocomplete.Results, nil
+}
+
+// AvailabilitySlot is one open reservation slot returned by
+// `RestaurantsAvailability`. The slot tokens are short-lived (~minutes) and
+// are required to actually book the slot via `make-reservation`.
+type AvailabilitySlot struct {
+	IsAvailable          bool     `json:"isAvailable"`
+	TimeOffsetMinutes    int      `json:"timeOffsetMinutes"`
+	SlotHash             string   `json:"slotHash"`
+	SlotAvailabilityToken string  `json:"slotAvailabilityToken"`
+	PointsType           string   `json:"pointsType,omitempty"`
+	PointsValue          int      `json:"pointsValue,omitempty"`
+	Attributes           []string `json:"attributes,omitempty"`
+}
+
+// AvailabilityDay is one day in the availability response. `Date` is
+// YYYY-MM-DD; `Slots` lists per-time slots. Empty `Slots` means no openings
+// were found for the requested party + time window on that day.
+type AvailabilityDay struct {
+	Date  string             `json:"date"`
+	Slots []AvailabilitySlot `json:"slots"`
+}
+
+// RestaurantAvailability is the per-restaurant chunk of the response: one
+// restaurant's availability across N days starting from `date`.
+type RestaurantAvailability struct {
+	RestaurantID    int               `json:"restaurantId"`
+	AvailabilityDays []AvailabilityDay `json:"availabilityDays"`
+}
+
+// RestaurantsAvailability calls the documented `RestaurantsAvailability`
+// GraphQL persisted-query and returns one chunk per requested restaurant ID.
+// Slot tokens in the response are short-lived (~minutes) and are required
+// for the actual booking POST.
+func (c *Client) RestaurantsAvailability(ctx context.Context, restaurantIDs []int, date, hhmm string, partySize, forwardDays, forwardMinutes, forwardSlots int) ([]RestaurantAvailability, error) {
+	if forwardDays <= 0 {
+		forwardDays = 1
+	}
+	if forwardMinutes <= 0 {
+		forwardMinutes = 150
+	}
+	if forwardSlots <= 0 {
+		forwardSlots = 5
+	}
+	if hhmm == "" {
+		hhmm = "19:00"
+	}
+	if partySize <= 0 {
+		partySize = 2
+	}
+	body := map[string]any{
+		"operationName": "RestaurantsAvailability",
+		"variables": map[string]any{
+			"onlyPop":          false,
+			"forwardDays":      forwardDays,
+			"requireTimes":     true,
+			"requireTypes":     []string{"Standard", "Experience"},
+			"restaurantIds":    restaurantIDs,
+			"date":             date,
+			"time":             hhmm,
+			"partySize":        partySize,
+			"databaseRegion":   "NA",
+			"forwardMinutes":   forwardMinutes,
+			"forwardTimeslots": forwardSlots,
+		},
+		"extensions": map[string]any{
+			"persistedQuery": map[string]any{
+				"version":    1,
+				"sha256Hash": RestaurantsAvailabilityHash,
+			},
+		},
+	}
+	parsed, err := c.gqlCall(ctx, "RestaurantsAvailability", body)
+	if err != nil {
+		return nil, err
+	}
+	type respShape struct {
+		Data struct {
+			Availability []RestaurantAvailability `json:"availability"`
+		} `json:"data"`
+		Errors []struct {
+			Message    string `json:"message"`
+			Extensions struct {
+				Code string `json:"code"`
+			} `json:"extensions"`
+		} `json:"errors"`
+	}
+	var r respShape
+	if err := json.Unmarshal(parsed, &r); err != nil {
+		return nil, fmt.Errorf("parsing RestaurantsAvailability response: %w", err)
+	}
+	if len(r.Errors) > 0 {
+		// Surface PersistedQueryNotFound with a clear hint — the cached
+		// hash has drifted past whatever OT's bundle currently expects.
+		first := r.Errors[0]
+		if strings.Contains(strings.ToUpper(first.Message), "PERSISTED") || first.Extensions.Code == "PERSISTED_QUERY_NOT_FOUND" {
+			return nil, fmt.Errorf("opentable: persisted-query hash drifted (RestaurantsAvailability returned %q); cached hash %s no longer accepted by upstream — the cached value will need to be refreshed in a follow-up release", first.Message, RestaurantsAvailabilityHash[:16])
+		}
+		return nil, fmt.Errorf("opentable RestaurantsAvailability: %s", first.Message)
+	}
+	return r.Data.Availability, nil
+}
+
+// RestaurantIDFromQuery resolves a free-text query (or a slug like
+// `le-bernardin-new-york`) to a restaurant ID via Autocomplete. Picks the
+// first result whose lowercase name contains the lowercase query
+// (slug-dashes converted to spaces). Returns 0 if no match — caller
+// surfaces a "couldn't resolve" error.
+func (c *Client) RestaurantIDFromQuery(ctx context.Context, query string, lat, lng float64) (id int, name, slug string, err error) {
+	q := strings.ReplaceAll(strings.ToLower(query), "-", " ")
+	q = strings.TrimSpace(q)
+	if q == "" {
+		return 0, "", "", fmt.Errorf("empty query")
+	}
+	results, err := c.Autocomplete(ctx, q, lat, lng)
+	if err != nil {
+		return 0, "", "", err
+	}
+	for _, r := range results {
+		nameLower := strings.ToLower(r.Name)
+		if r.Type != "Restaurant" {
+			continue
+		}
+		if !strings.Contains(nameLower, q) && !strings.Contains(q, nameLower) {
+			// Some autocomplete responses lead with token-prefix matches.
+			// If the user passed a multi-word query and the result name
+			// matches the first significant token, accept.
+			tokens := strings.Fields(q)
+			if len(tokens) == 0 || !strings.Contains(nameLower, tokens[0]) {
+				continue
+			}
+		}
+		idInt := 0
+		fmt.Sscanf(r.ID, "%d", &idInt)
+		if idInt == 0 {
+			continue
+		}
+		return idInt, r.Name, r.URLSlug, nil
+	}
+	return 0, "", "", fmt.Errorf("no opentable restaurant matched %q", query)
 }
 
 // gqlCall posts a GraphQL request with the persisted-query envelope. On

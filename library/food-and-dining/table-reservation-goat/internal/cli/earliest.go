@@ -198,27 +198,61 @@ func resolveEarliestForVenue(ctx context.Context, s *auth.Session, venue string,
 	if tryOT {
 		c, err := opentable.New(s)
 		if err == nil {
-			r, err := c.RestaurantBySlug(ctx, slug)
-			if err == nil && r != nil {
-				row.Network = "opentable"
-				row.URL = opentable.Origin + "/r/" + slug
-				if lat, ok := r["latitude"].(float64); ok {
-					row.Latitude = lat
-				}
-				if lng, ok := r["longitude"].(float64); ok {
-					row.Longitude = lng
-				}
-				// Honest no-op: OT availability requires the
-				// RestaurantsAvailability persisted-query hash,
-				// which v1 doesn't bootstrap. We confirmed the
-				// venue exists, but cannot answer "is a slot open?"
-				// on the OT side. Set Available=false with a
-				// reason that names the v0.2 work; do NOT pretend
-				// we polled successfully.
+			row.Network = "opentable"
+			// Resolve slug → restaurant ID via Autocomplete. The OT
+			// `RestaurantsAvailability` GraphQL takes a numeric
+			// restaurantId, not a slug. Slug-format queries
+			// (`le-bernardin`) are converted to spaced names.
+			restID, restName, _, rerr := c.RestaurantIDFromQuery(ctx, slug, 0, 0)
+			if rerr != nil {
 				row.Available = false
-				row.Reason = "opentable: venue resolved but availability checking is a v0.2 feature (needs RestaurantsAvailability persisted-query bootstrap). For real availability, use a `tock:<slug>` prefix or pick a venue listed on Tock."
+				row.Reason = fmt.Sprintf("opentable: could not resolve %q (%v)", slug, rerr)
 				return row
 			}
+			row.URL = fmt.Sprintf("%s/restaurant/profile/%d", opentable.Origin, restID)
+			// Call RestaurantsAvailability for `within` days
+			// starting from `date`, with the requested party size
+			// and a default 19:00 anchor time + 2.5h forward window.
+			avail, aerr := c.RestaurantsAvailability(ctx, []int{restID}, date, "19:00", party, within, 150, 5)
+			if aerr != nil {
+				row.Available = false
+				row.Reason = fmt.Sprintf("opentable %s (id=%d): %v", restName, restID, aerr)
+				return row
+			}
+			// Find the earliest slot with isAvailable=true across all
+			// returned days.
+			var earliestSlotAt string
+			for _, ra := range avail {
+				if ra.RestaurantID != restID {
+					continue
+				}
+				for _, d := range ra.AvailabilityDays {
+					for _, s := range d.Slots {
+						if !s.IsAvailable {
+							continue
+						}
+						hh := 19 + s.TimeOffsetMinutes/60
+						mm := s.TimeOffsetMinutes % 60
+						if mm < 0 {
+							hh -= 1
+							mm += 60
+						}
+						slot := fmt.Sprintf("%sT%02d:%02d", d.Date, hh, mm)
+						if earliestSlotAt == "" || slot < earliestSlotAt {
+							earliestSlotAt = slot
+						}
+					}
+				}
+			}
+			if earliestSlotAt != "" {
+				row.Available = true
+				row.SlotAt = earliestSlotAt
+				row.Reason = fmt.Sprintf("opentable %s: earliest slot at %s", restName, earliestSlotAt)
+			} else {
+				row.Available = false
+				row.Reason = fmt.Sprintf("opentable %s: no open slots in %d-day window for party=%d", restName, within, party)
+			}
+			return row
 		}
 	}
 	if row.Network == "" {

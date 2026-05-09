@@ -102,13 +102,6 @@ func newWatchAddCmd(flags *rootFlags) *cobra.Command {
 			if network == "" {
 				network = "auto"
 			}
-			if network == "opentable" {
-				// OT-routed watches are no-ops in v1 because OT availability
-				// watching needs the RestaurantsAvailability persisted-query
-				// hash bootstrap (v0.2). Refuse rather than store a watch the
-				// user thinks is active — silent no-ops are worse than errors.
-				return fmt.Errorf("opentable-only watches are a v0.2 feature (needs RestaurantsAvailability bootstrap). Use 'tock:<slug>' for Tock-side watches, or 'auto' (no prefix) to let watch tick poll Tock when the venue exists on both networks")
-			}
 			id := newWatchID()
 			row := watchRow{
 				ID: id, Venue: args[0], Network: network, Slug: slug,
@@ -322,19 +315,37 @@ func pollOneWatch(ctx context.Context, s *auth.Session, id, venue, network, slug
 		}
 	}
 	if tryOT && !r.Polled {
-		// OpenTable availability watching is a v0.2 feature: it requires
-		// the `RestaurantsAvailability` GraphQL persisted-query hash,
-		// which v1 doesn't bootstrap (only `Autocomplete` is captured).
-		// We MUST NOT report Polled=true here — that would let cron jobs
-		// silently miss real openings while the watch ticks daily and
-		// always reports HasMatch=false. Surface honest no-op so the
-		// user knows OT-side polling is unavailable until v0.2.
 		c, err := opentable.New(s)
 		if err == nil {
-			if rdata, err := c.RestaurantBySlug(ctx, slug); err == nil && rdata != nil {
+			restID, restName, _, rerr := c.RestaurantIDFromQuery(ctx, slug, 0, 0)
+			if rerr == nil && restID != 0 {
+				today := time.Now().Format("2006-01-02")
+				avail, aerr := c.RestaurantsAvailability(ctx, []int{restID}, today, "19:00", party, 7, 150, 5)
+				if aerr == nil {
+					r.Polled = true
+					r.Network = "opentable"
+					anyOpen := false
+					for _, ra := range avail {
+						for _, d := range ra.AvailabilityDays {
+							for _, sl := range d.Slots {
+								if sl.IsAvailable {
+									anyOpen = true
+									break
+								}
+							}
+						}
+					}
+					if anyOpen {
+						r.HasMatch = true
+						r.Reason = fmt.Sprintf("opentable %s: at least one open slot found", restName)
+					} else {
+						r.Reason = fmt.Sprintf("opentable %s: no open slots in 7d window for party=%d", restName, party)
+					}
+					return r
+				}
 				r.Network = "opentable"
 				r.Polled = false
-				r.Reason = "opentable: venue resolved but availability watching is a v0.2 feature (needs RestaurantsAvailability persisted-query bootstrap); this watch is a no-op on the OT side. Use Tock-routed watches (`tock:<slug>`) for real polling, or wait for v0.2."
+				r.Reason = fmt.Sprintf("opentable %s (id=%d): %v", restName, restID, aerr)
 				return r
 			}
 		}
