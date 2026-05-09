@@ -184,27 +184,58 @@ func resolveEarliestForVenue(ctx context.Context, s *auth.Session, venue string,
 	// both networks; preferring Tock means the user gets a real
 	// `Available=true|false` answer rather than the OT-side honest no-op.
 	if tryTock {
+		// Tock's VenueAvailability is single-date; iterate from `date`
+		// through `date + within - 1` so a `--within 14d` query actually
+		// scans 14 days. Without this loop the Tock branch silently
+		// queried only `date` and reported `Available=false` for any
+		// venue whose only openings fall on day 2..N — the same pollOneWatch
+		// bug, replicated in resolveEarliestForVenue.
 		c, err := tock.New(s)
 		if err == nil {
-			detail, err := c.VenueAvailability(ctx, slug, date, party, "")
-			if err == nil {
-				row.Network = "tock"
-				row.URL = tock.Origin + "/" + slug
-				row.Available = false
+			start, perr := time.Parse("2006-01-02", date)
+			if perr != nil {
+				start = time.Now()
+			}
+			scanned := 0
+			matchedDate := ""
+			matchedCount := 0
+			for d := 0; d < within; d++ {
+				dayStr := start.AddDate(0, 0, d).Format("2006-01-02")
+				detail, derr := c.VenueAvailability(ctx, slug, dayStr, party, "")
+				if derr != nil {
+					if scanned == 0 {
+						// remember the first error so we can surface it if
+						// every day errors
+						row.Reason = fmt.Sprintf("tock %s: %v", slug, derr)
+					}
+					continue
+				}
+				scanned++
 				if cal, ok := detail["calendar"].(map[string]any); ok {
 					if offerings, ok := cal["offerings"].(map[string]any); ok {
 						if exp, ok := offerings["experience"].([]any); ok && len(exp) > 0 {
-							row.Available = true
-							row.Reason = fmt.Sprintf("found %d experience offerings", len(exp))
+							matchedDate = dayStr
+							matchedCount = len(exp)
+							break
 						}
 					}
 				}
-				if !row.Available && row.Reason == "" {
-					row.Reason = "no offerings returned by Tock SSR for the requested date"
+			}
+			if scanned > 0 {
+				row.Network = "tock"
+				row.URL = tock.Origin + "/" + slug
+				if matchedDate != "" {
+					row.Available = true
+					row.SlotAt = matchedDate
+					row.Reason = fmt.Sprintf("tock: %d experience offerings on %s (within %dd window)", matchedCount, matchedDate, within)
+				} else {
+					row.Available = false
+					row.Reason = fmt.Sprintf("tock: no offerings in %d-day window from %s", within, start.Format("2006-01-02"))
 				}
 				return row
 			}
-			row.Reason = fmt.Sprintf("tock %s: %v", slug, err)
+			// All days errored — fall through to OT branch with row.Reason
+			// preserving the first error encountered.
 		}
 	}
 	if tryOT {
