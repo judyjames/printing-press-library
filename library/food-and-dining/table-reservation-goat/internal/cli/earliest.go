@@ -265,7 +265,7 @@ func resolveEarliestForVenue(ctx context.Context, s *auth.Session, venue string,
 			// without a coordinate to anchor on. Defaulting to NYC (which has
 			// the largest OT footprint) lets the GraphQL search the global
 			// index and still match restaurants in any metro.
-			restID, restName, _, rerr := c.RestaurantIDFromQuery(ctx, slug, 40.7128, -74.0060)
+			restID, restName, restSlug, rerr := c.RestaurantIDFromQuery(ctx, slug, 40.7128, -74.0060)
 			if rerr != nil {
 				row.Available = false
 				row.Reason = fmt.Sprintf("opentable: could not resolve %q (%v)", slug, rerr)
@@ -277,19 +277,27 @@ func resolveEarliestForVenue(ctx context.Context, s *auth.Session, venue string,
 			// and a default 19:00 anchor time + 2.5h forward window.
 			avail, aerr := c.RestaurantsAvailability(ctx, []int{restID}, date, "19:00", party, within, 150, 5)
 			if aerr != nil {
-				row.Available = false
-				// Akamai's WAF currently blocks `opname=RestaurantsAvailability`.
-				// Slug-resolution still works, so the row carries the venue ID
-				// and the bookable URL — the user can click through to OT to
-				// book directly. Phrase the reason so it's clear this is OT's
-				// edge defense, not a missing reservation.
+				// Akamai's WAF blocks `opname=RestaurantsAvailability` at the
+				// edge for any non-real-Chrome client. Fall back to a brief
+				// headless Chrome that navigates to the page and intercepts
+				// its own runtime XHR — the real browser passes Akamai
+				// because it runs the JS sensor naturally.
 				if _, isBot := opentable.IsBotDetection(aerr); isBot {
-					row.Reason = fmt.Sprintf("opentable %s (id=%d): availability lookup blocked by Akamai WAF on opname=RestaurantsAvailability; venue exists, book directly at %s",
-						restName, restID, row.URL)
+					chromeAvail, cerr := c.ChromeAvailability(ctx, restID, restSlug, date, "19:00", party, within)
+					if cerr == nil {
+						avail = chromeAvail
+						aerr = nil
+					} else {
+						row.Available = false
+						row.Reason = fmt.Sprintf("opentable %s (id=%d): direct path blocked by Akamai (%v); chrome fallback also failed: %v; venue exists, book directly at %s",
+							restName, restID, aerr, cerr, row.URL)
+						return row
+					}
 				} else {
+					row.Available = false
 					row.Reason = fmt.Sprintf("opentable %s (id=%d): %v", restName, restID, aerr)
+					return row
 				}
-				return row
 			}
 			// Find the earliest slot with isAvailable=true across all
 			// returned days.
