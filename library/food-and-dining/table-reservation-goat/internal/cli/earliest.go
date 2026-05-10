@@ -272,57 +272,92 @@ func resolveEarliestForVenue(ctx context.Context, s *auth.Session, venue string,
 				return row
 			}
 			row.URL = fmt.Sprintf("%s/restaurant/profile/%d", opentable.Origin, restID)
-			// Call RestaurantsAvailability for `within` days
-			// starting from `date`, with the requested party size
-			// and a default 19:00 anchor time + 2.5h forward window.
-			avail, aerr := c.RestaurantsAvailability(ctx, []int{restID}, date, "19:00", party, within, 150, 5)
-			if aerr != nil {
-				// Akamai's WAF blocks `opname=RestaurantsAvailability` at the
-				// edge for any non-real-Chrome client. Fall back to a brief
-				// headless Chrome that navigates to the page and intercepts
-				// its own runtime XHR — the real browser passes Akamai
-				// because it runs the JS sensor naturally.
-				if _, isBot := opentable.IsBotDetection(aerr); isBot {
-					chromeAvail, cerr := c.ChromeAvailability(ctx, restID, restSlug, date, "19:00", party, within)
-					if cerr == nil {
-						avail = chromeAvail
-						aerr = nil
-					} else {
-						row.Available = false
-						row.Reason = fmt.Sprintf("opentable %s (id=%d): direct path blocked by Akamai (%v); chrome fallback also failed: %v; venue exists, book directly at %s",
-							restName, restID, aerr, cerr, row.URL)
-						return row
+			// New OT gateway (May 2026) returns single-day availability per
+			// call (forwardDays=0); scan multi-day windows by looping the
+			// caller's `--within` over consecutive dates and merging results.
+			startDate, derr := time.Parse("2006-01-02", date)
+			if derr != nil {
+				startDate = time.Now()
+			}
+			var avail []opentable.RestaurantAvailability
+			var aerr error
+			for d := 0; d < within; d++ {
+				dayStr := startDate.AddDate(0, 0, d).Format("2006-01-02")
+				dayAvail, derr := c.RestaurantsAvailability(ctx, []int{restID}, dayStr, "19:00", party, 0, 210, 0)
+				if derr != nil {
+					// Akamai's WAF blocks `opname=RestaurantsAvailability` at the
+					// edge for any non-real-Chrome client. Fall back to a brief
+					// headless Chrome that navigates to the page and intercepts
+					// its own runtime XHR — the real browser passes Akamai
+					// because it runs the JS sensor naturally.
+					if _, isBot := opentable.IsBotDetection(derr); isBot {
+						chromeAvail, cerr := c.ChromeAvailability(ctx, restID, restSlug, dayStr, "19:00", party, 0)
+						if cerr == nil {
+							avail = append(avail, chromeAvail...)
+							continue
+						}
+						aerr = fmt.Errorf("direct path blocked by Akamai (%v); chrome fallback also failed: %v", derr, cerr)
+						break
 					}
-				} else {
-					row.Available = false
-					row.Reason = fmt.Sprintf("opentable %s (id=%d): %v", restName, restID, aerr)
-					return row
+					aerr = derr
+					break
 				}
+				avail = append(avail, dayAvail...)
+			}
+			if aerr != nil {
+				row.Available = false
+				row.Reason = fmt.Sprintf("opentable %s (id=%d): %v; venue exists, book directly at %s",
+					restName, restID, aerr, row.URL)
+				return row
 			}
 			// Find the earliest slot with isAvailable=true across all
-			// returned days.
-			var earliestSlotAt string
+			// returned days. The new GraphQL schema (May 2026) carries
+			// `dayOffset` (days from the requested `date`) instead of a
+			// literal `date` field, so we compute the actual date as
+			// requestDate + dayOffset, and resolve slot time as
+			// requestTime + timeOffsetMinutes.
+			startDate, perr := time.Parse("2006-01-02", date)
+			if perr != nil {
+				startDate = time.Now()
+			}
+			anchorHH := 19
+			anchorMM := 0
+			var bookable []string
 			for _, ra := range avail {
 				if ra.RestaurantID != restID {
 					continue
 				}
 				for _, d := range ra.AvailabilityDays {
+					dayDate := d.Date
+					if dayDate == "" {
+						dayDate = startDate.AddDate(0, 0, d.DayOffset).Format("2006-01-02")
+					}
 					for _, s := range d.Slots {
 						if !s.IsAvailable {
 							continue
 						}
-						hh := 19 + s.TimeOffsetMinutes/60
-						mm := s.TimeOffsetMinutes % 60
-						if mm < 0 {
-							hh -= 1
-							mm += 60
-						}
-						slot := fmt.Sprintf("%sT%02d:%02d", d.Date, hh, mm)
-						if earliestSlotAt == "" || slot < earliestSlotAt {
-							earliestSlotAt = slot
-						}
+						totalMin := anchorHH*60 + anchorMM + s.TimeOffsetMinutes
+						hh := ((totalMin/60)%24 + 24) % 24
+						mm := ((totalMin % 60) + 60) % 60
+						bookable = append(bookable, fmt.Sprintf("%sT%02d:%02d", dayDate, hh, mm))
 					}
 				}
+			}
+			sort.Strings(bookable)
+			seen := map[string]bool{}
+			deduped := bookable[:0]
+			for _, b := range bookable {
+				if seen[b] {
+					continue
+				}
+				seen[b] = true
+				deduped = append(deduped, b)
+			}
+			bookable = deduped
+			var earliestSlotAt string
+			if len(bookable) > 0 {
+				earliestSlotAt = bookable[0]
+				row.BookableTimes = bookable
 			}
 			if earliestSlotAt != "" {
 				row.Available = true

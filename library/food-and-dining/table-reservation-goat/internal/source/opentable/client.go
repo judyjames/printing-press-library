@@ -12,6 +12,7 @@ package opentable
 
 import (
 	"context"
+	cryptoRand "crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -51,7 +52,11 @@ const (
 	// PersistedQueryNotFound (400) error, the client surfaces a clear hint
 	// that the user should run `doctor --refresh-hashes` (a v0.2 escape
 	// hatch).
-	RestaurantsAvailabilityHash = "e6b87021ed6e865a7778aa39d35d09864c1be29c683c707602dd3de43c854d86"
+	// RestaurantsAvailabilityHash captured live from the OT consumer frontend
+	// in May 2026. The hash rotates roughly per-bundle release; if it drifts
+	// the gateway returns 409 (Apollo persisted-query mismatch) and a
+	// follow-up needs to re-capture from a fresh /r/<slug> request.
+	RestaurantsAvailabilityHash = "cbcf4838a9b399f742e3741785df64560a826d8d3cc2828aa01ab09a8455e29e"
 
 	defaultTimeout = 30 * time.Second
 )
@@ -153,14 +158,32 @@ func (c *Client) do429Aware(req *http.Request) (*http.Response, error) {
 		// is operation-specific (e.g. Akamai's WAF rule on
 		// `opname=RestaurantsAvailability`) and shouldn't poison sibling
 		// operations like Autocomplete that work fine on the same session.
-		// Return a one-shot BotDetectionError without persisting.
 		if req.URL.Path != bootstrapPath {
+			// Akamai's opname-specific WAF rule is PROBABILISTIC — same
+			// request retried 750ms later often goes through. Single retry
+			// caps the cost; more retries would just compound the session's
+			// reputation hit and trigger genuine bans.
+			if req.GetBody != nil {
+				time.Sleep(750 * time.Millisecond)
+				retry := req.Clone(req.Context())
+				if newBody, gerr := req.GetBody(); gerr == nil {
+					retry.Body = newBody
+				}
+				retryResp, retryErr := c.http.Do(retry)
+				if retryErr == nil {
+					if retryResp.StatusCode == 200 {
+						c.limiter.OnSuccess()
+						return retryResp, nil
+					}
+					retryResp.Body.Close()
+				}
+			}
 			return nil, &BotDetectionError{
 				URL:    req.URL.String(),
 				Status: 403,
 				Streak: 1,
 				Until:  time.Now().Add(1 * time.Minute),
-				Reason: fmt.Sprintf("403 from %s (operation-specific WAF rule, not a session-wide block)", req.URL.Path),
+				Reason: fmt.Sprintf("403 from %s after retry (operation-specific WAF rule, not a session-wide block)", req.URL.Path),
 			}
 		}
 		bde, sErr := setCooldown(fmt.Sprintf("403 from %s (Akamai anti-bot)", req.URL.Path))
@@ -408,12 +431,14 @@ type AvailabilitySlot struct {
 	Attributes            []string `json:"attributes,omitempty"`
 }
 
-// AvailabilityDay is one day in the availability response. `Date` is
-// YYYY-MM-DD; `Slots` lists per-time slots. Empty `Slots` means no openings
-// were found for the requested party + time window on that day.
+// AvailabilityDay is one day in the availability response. The new gateway
+// (May 2026) returns `DayOffset` (days from the requested `date`) instead of
+// a `Date` field — `Date` is left for back-compat but is unset on fresh
+// responses; callers compute the actual date as request.Date + DayOffset.
 type AvailabilityDay struct {
-	Date  string             `json:"date"`
-	Slots []AvailabilitySlot `json:"slots"`
+	Date      string             `json:"date,omitempty"`
+	DayOffset int                `json:"dayOffset"`
+	Slots     []AvailabilitySlot `json:"slots"`
 }
 
 // RestaurantAvailability is the per-restaurant chunk of the response: one
@@ -443,20 +468,44 @@ func (c *Client) RestaurantsAvailability(ctx context.Context, restaurantIDs []in
 	if partySize <= 0 {
 		partySize = 2
 	}
+	// Variable shape captured live from the OT consumer frontend (May 2026):
+	// onlyPop / requireTimes / useCBR / privilegedAccess flags drive feature
+	// gating; the older v3 shape (useNewVersion / forwardSlots / etc.) is
+	// gone. forwardDays=0 + forwardMinutes/backwardMinutes describes a
+	// time WINDOW around the requested time on a single day, not a multi-day
+	// span; the page hits this endpoint per-day when scanning a window.
+	// `restaurantAvailabilityTokens` and `loyaltyRedemptionTiers` are arrays
+	// the gateway requires to be present (empty arrays accepted).
+	// `attributionToken` and `correlationId` are analytics; safe to leave
+	// blank — server treats absence as an anonymous request.
 	body := map[string]any{
 		"operationName": "RestaurantsAvailability",
 		"variables": map[string]any{
-			"onlyPop":          false,
-			"forwardDays":      forwardDays,
-			"requireTimes":     true,
-			"requireTypes":     []string{"Standard", "Experience"},
+			"onlyPop": false,
+			// forwardDays=0 means "single day" in the new gateway —
+			// forwardMinutes/backwardMinutes describe a time window
+			// on the requested date only. Multi-day scans loop the
+			// caller's `forwardDays` outside this function.
+			"forwardDays":      0,
+			"requireTimes":     false,
+			"requireTypes":     []string{"Standard"},
+			"useCBR":           false,
+			"privilegedAccess": []string{"UberOneDiningProgram"},
 			"restaurantIds":    restaurantIDs,
 			"date":             date,
 			"time":             hhmm,
 			"partySize":        partySize,
-			"databaseRegion":   "NA",
-			"forwardMinutes":   forwardMinutes,
-			"forwardTimeslots": forwardSlots,
+			// "NA" (North America) — the gateway validates against a
+			// known region enum; "us" rejects with HTTP 400.
+			"databaseRegion":               "NA",
+			"restaurantAvailabilityTokens": []string{},
+			"loyaltyRedemptionTiers":       []string{},
+			"attributionToken":             "",
+			// correlationId is a per-request UUID the gateway logs.
+			// Empty string sometimes 400s; a fresh UUID always passes.
+			"correlationId":   newUUID(),
+			"forwardMinutes":  forwardMinutes,
+			"backwardMinutes": forwardMinutes,
 		},
 		"extensions": map[string]any{
 			"persistedQuery": map[string]any{
@@ -465,6 +514,7 @@ func (c *Client) RestaurantsAvailability(ctx context.Context, restaurantIDs []in
 			},
 		},
 	}
+	_ = forwardSlots // accepted for signature parity; new gateway uses time window instead
 	parsed, err := c.gqlCall(ctx, "RestaurantsAvailability", body)
 	if err != nil {
 		return nil, err
@@ -572,19 +622,35 @@ func (c *Client) gqlCall(ctx context.Context, opname string, body any) ([]byte, 
 		return nil, fmt.Errorf("reading %s response: %w", opname, err)
 	}
 	if resp.StatusCode == 403 {
-		// Akamai's WAF maintains an opname-specific block list. As of
-		// 2026-05-09, `opname=RestaurantsAvailability` is on it — even with a
-		// fresh CSRF, valid session cookies, and a known-good Referer, the
-		// edge returns "Access Denied" before the request reaches Apollo.
-		// Surface this as a typed BotDetectionError so cross-network commands
-		// can fall back to other sources cleanly. The CSRF cache stays warm;
-		// only this specific op is gated.
+		// Akamai's WAF rule on this opname is probabilistic — sometimes
+		// blocks, sometimes lets through. Retry once after a short
+		// wait; if both attempts 403 we surface a typed BotDetectionError.
+		// Single retry only: more retries would compound Akamai's
+		// session reputation against us.
+		time.Sleep(750 * time.Millisecond)
+		retryReq, _ := http.NewRequestWithContext(ctx, http.MethodPost, u, strings.NewReader(string(js)))
+		for k, vals := range req.Header {
+			for _, v := range vals {
+				retryReq.Header.Add(k, v)
+			}
+		}
+		retryResp, retryErr := c.do429Aware(retryReq)
+		if retryErr == nil && retryResp.StatusCode == 200 {
+			defer retryResp.Body.Close()
+			retryData, rerr := io.ReadAll(retryResp.Body)
+			if rerr == nil {
+				return retryData, nil
+			}
+		}
+		if retryResp != nil {
+			retryResp.Body.Close()
+		}
 		return nil, &BotDetectionError{
 			URL:    u,
 			Status: 403,
 			Streak: 1,
-			Until:  time.Now().Add(5 * time.Minute),
-			Reason: "GraphQL " + opname + " 403'd by Akamai WAF (opname-specific rule); other operations on the same session may still work",
+			Until:  time.Now().Add(2 * time.Minute),
+			Reason: "GraphQL " + opname + " 403'd twice by Akamai WAF (probabilistic opname rule); other operations on the same session may still work",
 		}
 	}
 	if resp.StatusCode != 200 {
@@ -601,6 +667,22 @@ func (c *Client) gqlCall(ctx context.Context, opname string, body any) ([]byte, 
 		return nil, fmt.Errorf("opentable %s returned HTTP %d%s: %s", opname, resp.StatusCode, hint, truncate(string(data), 200))
 	}
 	return data, nil
+}
+
+// newUUID generates an RFC-4122 v4 UUID for the GraphQL correlationId.
+// crypto/rand is used because the gateway logs these and we don't want
+// CLI invocations to collide. Errors fall back to a deterministic value
+// so the request still goes out — the gateway validates shape, not
+// uniqueness.
+func newUUID() string {
+	var b [16]byte
+	if _, err := cryptoRand.Read(b[:]); err != nil {
+		return "00000000-0000-4000-8000-000000000000"
+	}
+	b[6] = (b[6] & 0x0f) | 0x40 // version 4
+	b[8] = (b[8] & 0x3f) | 0x80 // variant 10
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
+		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
 
 func truncate(s string, n int) string {
