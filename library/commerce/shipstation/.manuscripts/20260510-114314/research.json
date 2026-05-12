@@ -1,0 +1,337 @@
+{
+  "api_name": "shipstation",
+  "novelty_score": 0,
+  "alternatives": [
+    {
+      "name": "shipstation/mcp-shipstation-api",
+      "url": "https://github.com/shipstation/mcp-shipstation-api",
+      "language": "JavaScript",
+      "install_method": "",
+      "stars": 0,
+      "last_updated": "",
+      "command_count": 52,
+      "has_json_output": false,
+      "has_auth_support": false
+    },
+    {
+      "name": "rip-technologies/shipstation-node",
+      "url": "https://github.com/rip-technologies/shipstation-node",
+      "language": "TypeScript",
+      "install_method": "",
+      "stars": 0,
+      "last_updated": "",
+      "command_count": 0,
+      "has_json_output": false,
+      "has_auth_support": false
+    },
+    {
+      "name": "ShipEngine/shipengine-python",
+      "url": "https://github.com/ShipEngine/shipengine-python",
+      "language": "Python",
+      "install_method": "",
+      "stars": 0,
+      "last_updated": "",
+      "command_count": 0,
+      "has_json_output": false,
+      "has_auth_support": false
+    },
+    {
+      "name": "AustinBratcher/shipengine-js",
+      "url": "https://github.com/AustinBratcher/shipengine-js",
+      "language": "JavaScript",
+      "install_method": "",
+      "stars": 0,
+      "last_updated": "",
+      "command_count": 0,
+      "has_json_output": false,
+      "has_auth_support": false
+    },
+    {
+      "name": "kjaenicke/shipstation-node",
+      "url": "https://github.com/kjaenicke/shipstation-node",
+      "language": "JavaScript",
+      "install_method": "",
+      "stars": 0,
+      "last_updated": "",
+      "command_count": 0,
+      "has_json_output": false,
+      "has_auth_support": false
+    },
+    {
+      "name": "JustMaier/node-shipstation",
+      "url": "https://github.com/JustMaier/node-shipstation",
+      "language": "JavaScript",
+      "install_method": "",
+      "stars": 0,
+      "last_updated": "",
+      "command_count": 0,
+      "has_json_output": false,
+      "has_auth_support": false
+    },
+    {
+      "name": "mattcoatsworth/shipstation-mcp-server",
+      "url": "https://github.com/mattcoatsworth/shipstation-mcp-server",
+      "language": "JavaScript",
+      "install_method": "",
+      "stars": 0,
+      "last_updated": "",
+      "command_count": 0,
+      "has_json_output": false,
+      "has_auth_support": false
+    },
+    {
+      "name": "CDataSoftware/shipstation-mcp-server-by-cdata",
+      "url": "https://github.com/CDataSoftware/shipstation-mcp-server-by-cdata",
+      "language": "JavaScript",
+      "install_method": "",
+      "stars": 0,
+      "last_updated": "",
+      "command_count": 0,
+      "has_json_output": false,
+      "has_auth_support": false
+    }
+  ],
+  "gaps": [],
+  "patterns": [],
+  "recommendation": "proceed",
+  "researched_at": "2026-05-10T16:50:00Z",
+  "novel_features": [
+    {
+      "name": "Rate-quote history compare",
+      "command": "rate-history compare",
+      "description": "Replay persisted rate quotes to answer 'what would carrier B have cost on the labels carrier A actually shipped?' across any date range.",
+      "rationale": "Rate quotes are ephemeral in the ShipStation API. Once a label is bought, the alternate quotes are gone forever. Persisting every rate call locally is the only way to answer historical cost-comparison questions.",
+      "example": "shipstation-pp-cli rate-history compare --from 2026-04-01 --to 2026-04-30 --carrier ups_ground --vs fedex_home_delivery --json --select carrier,total_cost,delta",
+      "why_it_matters": "Use this when a finance or ops stakeholder asks 'what would we have saved on UPS vs FedEx last month?' without re-quoting hundreds of stale shipments.",
+      "group": "Rate intelligence"
+    },
+    {
+      "name": "Batch-error triage",
+      "command": "batches triage",
+      "description": "Lists every batch with unresolved errored sub-shipments, grouped by error reason and aged so you can fix the worst things first.",
+      "rationale": "The web UI shows one batch error at a time. Aggregating errors across all open batches by reason and age requires a local SQL view the API doesn't provide.",
+      "example": "shipstation-pp-cli batches triage --age 2h --json",
+      "why_it_matters": "Reach for this any time a warehouse asks 'which batches still have errors older than X hours?' — it replaces babysitting the errors tab.",
+      "group": "Batch ops"
+    },
+    {
+      "name": "Batch-error retry (errored-only)",
+      "command": "batches retry",
+      "description": "Re-process only the errored sub-shipments in a batch, instead of re-running the whole thing.",
+      "rationale": "ShipStation's batch process endpoint runs the entire batch again. Skimming just the failed sub-shipments from a local error log and re-submitting them is a common-but-tedious manual workflow.",
+      "example": "shipstation-pp-cli batches retry batch_a1b2c3 --only-errored --dry-run",
+      "why_it_matters": "Use when 4 of 150 sub-shipments fail and you want to retry exactly those 4 without re-paying the postage on the 146 that succeeded.",
+      "group": "Batch ops"
+    },
+    {
+      "name": "Label cost roll-up",
+      "command": "labels cost",
+      "description": "Pivot all labels by carrier / service / weight band with totals, averages, and week-over-week deltas.",
+      "rationale": "The ShipStation API returns one label at a time. Aggregating cost across thousands of labels with grouping is a local SQL aggregate that no MCP or wrapper exposes.",
+      "example": "shipstation-pp-cli labels cost --by carrier,service --week current --csv",
+      "why_it_matters": "Use for the weekly CFO shipping-spend report — pipe the CSV straight into Sheets.",
+      "group": "Cost analytics"
+    },
+    {
+      "name": "Inventory drift",
+      "command": "inventory drift",
+      "description": "Diff ShipStation inventory levels against an external truth file (OMS export, supplier catalog) and print every drifted SKU.",
+      "rationale": "Drift detection requires comparing two sources. The API exposes one source; the user supplies the other via a CSV/JSONL file.",
+      "example": "shipstation-pp-cli inventory drift --vs ./oms-snapshot.csv --threshold 5 --json",
+      "why_it_matters": "Use Tuesday morning to surface SKUs where ShipStation and the OMS disagree, before stockouts cause oversells.",
+      "group": "Inventory intelligence"
+    },
+    {
+      "name": "SKU velocity / stockout risk",
+      "command": "inventory velocity",
+      "description": "Joins last 30 days of shipped units against current on-hand inventory to compute days-of-cover per SKU and flag stockout risk.",
+      "rationale": "Velocity requires joining shipments to inventory and computing a moving window. ShipStation has no velocity endpoint; the web UI shows neither.",
+      "example": "shipstation-pp-cli inventory velocity --days-cover 14 --json --select sku,velocity_per_day,days_cover",
+      "why_it_matters": "Use Friday afternoon to see which SKUs run out before next week's PO arrives.",
+      "group": "Inventory intelligence"
+    },
+    {
+      "name": "End-of-day burndown",
+      "command": "eod burndown",
+      "description": "Today's shipments with no label, grouped by warehouse and age, so you can clear the floor before pickup.",
+      "rationale": "Local left-anti-join of shipments not in labels for today's date. The API can list both but cannot join them server-side.",
+      "example": "shipstation-pp-cli eod burndown --warehouse main --json",
+      "why_it_matters": "Run at 4:30pm before the carrier pickup to confirm every order on the floor has a label printed.",
+      "group": "Operations"
+    },
+    {
+      "name": "Orphan finder",
+      "command": "orphans",
+      "description": "Find shipments stuck without a label after N hours, plus optionally cross-check an OMS-side external-ID list against ShipStation shipments.",
+      "rationale": "Cross-source reconciliation needs both sides of the join. The API has neither concept of 'stuck' nor an external-ID-list filter.",
+      "example": "shipstation-pp-cli orphans --external-ids ./oms-orders.txt --stuck 4h --json",
+      "why_it_matters": "Use any time an integration goes quiet — orphans tells you exactly which orders are missing or stalled.",
+      "group": "Operations"
+    }
+  ],
+  "novel_features_built": [
+    {
+      "name": "Rate-quote history compare",
+      "command": "rate-history compare",
+      "description": "Replay persisted rate quotes to answer 'what would carrier B have cost on the labels carrier A actually shipped?' across any date range.",
+      "rationale": "Rate quotes are ephemeral in the ShipStation API. Once a label is bought, the alternate quotes are gone forever. Persisting every rate call locally is the only way to answer historical cost-comparison questions.",
+      "example": "shipstation-pp-cli rate-history compare --from 2026-04-01 --to 2026-04-30 --carrier ups_ground --vs fedex_home_delivery --json --select carrier,total_cost,delta",
+      "why_it_matters": "Use this when a finance or ops stakeholder asks 'what would we have saved on UPS vs FedEx last month?' without re-quoting hundreds of stale shipments.",
+      "group": "Rate intelligence"
+    },
+    {
+      "name": "Batch-error triage",
+      "command": "batches triage",
+      "description": "Lists every batch with unresolved errored sub-shipments, grouped by error reason and aged so you can fix the worst things first.",
+      "rationale": "The web UI shows one batch error at a time. Aggregating errors across all open batches by reason and age requires a local SQL view the API doesn't provide.",
+      "example": "shipstation-pp-cli batches triage --age 2h --json",
+      "why_it_matters": "Reach for this any time a warehouse asks 'which batches still have errors older than X hours?' — it replaces babysitting the errors tab.",
+      "group": "Batch ops"
+    },
+    {
+      "name": "Batch-error retry (errored-only)",
+      "command": "batches retry",
+      "description": "Re-process only the errored sub-shipments in a batch, instead of re-running the whole thing.",
+      "rationale": "ShipStation's batch process endpoint runs the entire batch again. Skimming just the failed sub-shipments from a local error log and re-submitting them is a common-but-tedious manual workflow.",
+      "example": "shipstation-pp-cli batches retry batch_a1b2c3 --only-errored --dry-run",
+      "why_it_matters": "Use when 4 of 150 sub-shipments fail and you want to retry exactly those 4 without re-paying the postage on the 146 that succeeded.",
+      "group": "Batch ops"
+    },
+    {
+      "name": "Label cost roll-up",
+      "command": "labels cost",
+      "description": "Pivot all labels by carrier / service / weight band with totals, averages, and week-over-week deltas.",
+      "rationale": "The ShipStation API returns one label at a time. Aggregating cost across thousands of labels with grouping is a local SQL aggregate that no MCP or wrapper exposes.",
+      "example": "shipstation-pp-cli labels cost --by carrier,service --week current --csv",
+      "why_it_matters": "Use for the weekly CFO shipping-spend report — pipe the CSV straight into Sheets.",
+      "group": "Cost analytics"
+    },
+    {
+      "name": "Inventory drift",
+      "command": "inventory drift",
+      "description": "Diff ShipStation inventory levels against an external truth file (OMS export, supplier catalog) and print every drifted SKU.",
+      "rationale": "Drift detection requires comparing two sources. The API exposes one source; the user supplies the other via a CSV/JSONL file.",
+      "example": "shipstation-pp-cli inventory drift --vs ./oms-snapshot.csv --threshold 5 --json",
+      "why_it_matters": "Use Tuesday morning to surface SKUs where ShipStation and the OMS disagree, before stockouts cause oversells.",
+      "group": "Inventory intelligence"
+    },
+    {
+      "name": "SKU velocity / stockout risk",
+      "command": "inventory velocity",
+      "description": "Joins last 30 days of shipped units against current on-hand inventory to compute days-of-cover per SKU and flag stockout risk.",
+      "rationale": "Velocity requires joining shipments to inventory and computing a moving window. ShipStation has no velocity endpoint; the web UI shows neither.",
+      "example": "shipstation-pp-cli inventory velocity --days-cover 14 --json --select sku,velocity_per_day,days_cover",
+      "why_it_matters": "Use Friday afternoon to see which SKUs run out before next week's PO arrives.",
+      "group": "Inventory intelligence"
+    },
+    {
+      "name": "End-of-day burndown",
+      "command": "eod burndown",
+      "description": "Today's shipments with no label, grouped by warehouse and age, so you can clear the floor before pickup.",
+      "rationale": "Local left-anti-join of shipments not in labels for today's date. The API can list both but cannot join them server-side.",
+      "example": "shipstation-pp-cli eod burndown --warehouse main --json",
+      "why_it_matters": "Run at 4:30pm before the carrier pickup to confirm every order on the floor has a label printed.",
+      "group": "Operations"
+    },
+    {
+      "name": "Orphan finder",
+      "command": "orphans",
+      "description": "Find shipments stuck without a label after N hours, plus optionally cross-check an OMS-side external-ID list against ShipStation shipments.",
+      "rationale": "Cross-source reconciliation needs both sides of the join. The API has neither concept of 'stuck' nor an external-ID-list filter.",
+      "example": "shipstation-pp-cli orphans --external-ids ./oms-orders.txt --stuck 4h --json",
+      "why_it_matters": "Use any time an integration goes quiet — orphans tells you exactly which orders are missing or stalled.",
+      "group": "Operations"
+    }
+  ],
+  "narrative": {
+    "display_name": "ShipStation",
+    "headline": "Every ShipStation v2 endpoint plus rate-quote history, batch-error triage, cost roll-ups, and inventory velocity that no MCP or web UI surfaces.",
+    "value_prop": "Wraps the entire 101-endpoint ShipStation API v2 with a local SQLite store so you can answer questions the live API cannot. `rate-history compare` replays persisted quotes; `batches triage` aggregates open errors by reason and age; `inventory velocity` flags stockout risk before it happens. Agent-native output (`--json`, `--select`, typed exit codes) and offline replay come standard.",
+    "auth_narrative": "Uses a single header `api-key`. Set `SHIPSTATION_API_KEY` in your environment (the same env var the official MCP uses) or pass `--api-key` per call. v1 legacy auth (key + secret over Basic) is not supported; this CLI targets the v2 ShipStation API at api.shipstation.com.",
+    "quickstart": [
+      {
+        "command": "shipstation-pp-cli doctor",
+        "comment": "Verifies the API key reaches api.shipstation.com and reports rate-limit budget."
+      },
+      {
+        "command": "shipstation-pp-cli carriers list --json --select carrier_id,friendly_name,services_count",
+        "comment": "Confirms which carriers are connected; small payload, fast first call."
+      },
+      {
+        "command": "shipstation-pp-cli sync --resources shipments,labels,rates,batches --since 30d",
+        "comment": "Pulls every shipment, label, rate quote, and batch from the last 30 days into the local SQLite store."
+      },
+      {
+        "command": "shipstation-pp-cli rate-history compare --from 2026-04-01 --to 2026-04-30 --carrier ups_ground --vs fedex_home_delivery --json",
+        "comment": "Answers 'what would FedEx have cost on every UPS Ground label last month?' without re-quoting."
+      },
+      {
+        "command": "shipstation-pp-cli batches triage --age 2h --json",
+        "comment": "Lists every batch with unresolved errors older than two hours, grouped by error reason."
+      }
+    ],
+    "troubleshoots": [
+      {
+        "symptom": "HTTP 429 with `Retry-After` header",
+        "fix": "ShipStation rate limit hit. Default is 200 req/min on production, 20 on sandbox. Re-run after the seconds in `Retry-After`, or pass `--rate-limit 100` to throttle preemptively."
+      },
+      {
+        "symptom": "401 Unauthorized on every call",
+        "fix": "The `SHIPSTATION_API_KEY` env var is missing, expired, or pointing at the wrong environment. Generate a new key in app settings; verify with `shipstation-pp-cli doctor`."
+      },
+      {
+        "symptom": "`rate-history compare` returns empty",
+        "fix": "Rates persist only when you run `rates calculate` or `rates estimate` through this CLI. Run a few rate calls first, or run `sync --resources rates` if you have realized rates from labels."
+      },
+      {
+        "symptom": "`batches retry --only-errored` aborts with 'no errored sub-shipments found'",
+        "fix": "Run `batches list-errors \u003cbatch-id\u003e` first to populate the local batch_errors table. Errors are only fetched once when you list them."
+      }
+    ],
+    "when_to_use": "Use this CLI when you need to script ShipStation operations from a shell, run a Claude Code agent against a real shipping account, or run analytics that the web UI cannot answer. It is best at: rate-shopping with historical comparison, bulk label burst with error triage, inventory drift detection across an OMS, and end-of-day reconciliation before a carrier pickup. Skip it if you just need to print one label \\u2014 the web UI is faster.",
+    "recipes": [
+      {
+        "title": "Compare every UPS Ground label this month against FedEx",
+        "command": "shipstation-pp-cli rate-history compare --from 2026-04-01 --to 2026-04-30 --carrier ups_ground --vs fedex_home_delivery --json --select label_id,carrier,total_cost,alt_carrier,alt_cost,delta",
+        "explanation": "Joins persisted UPS labels with the closest stored FedEx quotes; `--select` keeps the response compact for agents to parse."
+      },
+      {
+        "title": "Find every batch with errors older than 2 hours",
+        "command": "shipstation-pp-cli batches triage --age 2h --json",
+        "explanation": "Local SQL over the batch_errors table; sorts by oldest unresolved error so you fix the worst things first."
+      },
+      {
+        "title": "Re-process only the errored sub-shipments in a batch",
+        "command": "shipstation-pp-cli batches retry batch_a1b2c3 --only-errored --dry-run",
+        "explanation": "Reads errored sub-shipment IDs from the local batch_errors table; `--dry-run` shows what would re-process without spending postage."
+      },
+      {
+        "title": "Generate Friday's CFO shipping-spend report",
+        "command": "shipstation-pp-cli labels cost --by carrier,service --week current --csv \u003e shipping-spend.csv",
+        "explanation": "Pivots every label cut this week by carrier and service; pipe straight into Sheets for the CFO."
+      },
+      {
+        "title": "Surface stockout-risk SKUs (narrowing a verbose response)",
+        "command": "shipstation-pp-cli inventory velocity --days-cover 14 --json --select sku,on_hand,velocity_per_day,days_cover,warehouse",
+        "explanation": "Velocity calls return a row per SKU per warehouse; `--select` narrows the deeply-nested payload to the five fields agents need."
+      },
+      {
+        "title": "Find orphan orders missing from ShipStation",
+        "command": "shipstation-pp-cli orphans --external-ids ./oms-orders.txt --stuck 4h --json",
+        "explanation": "Left-joins your OMS order list against ShipStation shipments; surfaces both stuck shipments and missing-from-ShipStation orders."
+      }
+    ],
+    "trigger_phrases": [
+      "ship a package via ShipStation",
+      "rate-shop carriers",
+      "process a ShipStation batch",
+      "triage batch errors",
+      "check inventory velocity",
+      "stockout risk",
+      "end-of-day shipping reconcile",
+      "shipping cost report",
+      "use shipstation",
+      "run shipstation"
+    ]
+  }
+}

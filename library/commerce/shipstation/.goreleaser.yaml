@@ -1,0 +1,51 @@
+version: 2
+project_name: shipstation-pp-cli
+changelog:
+  disable: true
+builds:
+  - id: shipstation-pp-cli
+    main: ./cmd/shipstation-pp-cli
+    binary: shipstation-pp-cli
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X github.com/mvanhorn/printing-press-library/library/commerce/shipstation/internal/cli.version={{ .Version }}
+    targets:
+      - darwin_amd64
+      - darwin_arm64
+      - linux_amd64
+      - linux_arm64
+      - windows_amd64
+      - windows_arm64
+  - id: shipstation-pp-mcp
+    main: ./cmd/shipstation-pp-mcp
+    binary: shipstation-pp-mcp
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+    targets:
+      - darwin_amd64
+      - darwin_arm64
+      - linux_amd64
+      - linux_arm64
+      - windows_amd64
+      - windows_arm64
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+checksum:
+  name_template: checksums.txt
+brews:
+  - name: shipstation-pp-cli
+    repository:
+      owner: james-bongiovanni
+      name: homebrew-tap
+    homepage: "https://github.com/mvanhorn/printing-press-library"
+    description: "Every ShipStation v2 endpoint plus rate-quote history, batch-error triage, cost roll-ups, and inventory velocity..."
+    install: |
+      bin.install "shipstation-pp-cli"
+      bin.install "shipstation-pp-mcp"

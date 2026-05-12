@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "api_name": "shipstation",
+  "cli_name": "shipstation-pp-cli",
+  "run_id": "20260510-114314",
+  "status": "skip",
+  "skip_reason": "no ShipStation auth (SHIPSTATION_API_KEY) available in polish environment; live phase5 acceptance not runnable. CLI verified via mock harness (verify pass rate 100%, 39/39) and dogfood (path validity 4/4, auth protocol MATCH, dead-code clean, novel features 8/8 survived, MCP surface PASS).",
+  "auth_context": {
+    "type": "api_key",
+    "api_key_available": false,
+    "browser_session_available": false
+  }
+}

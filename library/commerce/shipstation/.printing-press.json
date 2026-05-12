@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-05-12T15:38:20.157089Z",
+  "printing_press_version": "4.2.2",
+  "api_name": "shipstation",
+  "display_name": "Shipstation",
+  "cli_name": "shipstation-pp-cli",
+  "owner": "james-bongiovanni",
+  "printer": "james-bongiovanni",
+  "printer_name": "James Bongiovanni",
+  "spec_format": "openapi3",
+  "spec_checksum": "sha256:560d2188d0fa8b62037ea4e59003e5b6121bfe9bcaa5d26d41fe2d29cb85f01b",
+  "run_id": "20260510-114314",
+  "mcp_binary": "shipstation-pp-mcp",
+  "mcp_tool_count": 101,
+  "mcp_ready": "full",
+  "api_version": "2.0.0",
+  "auth_type": "api_key",
+  "auth_env_vars": [
+    "SHIPSTATION_API_KEY"
+  ],
+  "novel_features": [
+    {
+      "name": "Rate-quote history compare",
+      "command": "rate-history compare",
+      "description": "Replay persisted rate quotes to answer 'what would carrier B have cost on the labels carrier A actually shipped?' across any date range."
+    },
+    {
+      "name": "Batch-error triage",
+      "command": "batches triage",
+      "description": "Lists every batch with unresolved errored sub-shipments, grouped by error reason and aged so you can fix the worst things first."
+    },
+    {
+      "name": "Batch-error retry (errored-only)",
+      "command": "batches retry",
+      "description": "Re-process only the errored sub-shipments in a batch, instead of re-running the whole thing."
+    },
+    {
+      "name": "Label cost roll-up",
+      "command": "labels cost",
+      "description": "Pivot all labels by carrier / service / weight band with totals, averages, and week-over-week deltas."
+    },
+    {
+      "name": "Inventory drift",
+      "command": "inventory drift",
+      "description": "Diff ShipStation inventory levels against an external truth file (OMS export, supplier catalog) and print every drifted SKU."
+    },
+    {
+      "name": "SKU velocity / stockout risk",
+      "command": "inventory velocity",
+      "description": "Joins last 30 days of shipped units against current on-hand inventory to compute days-of-cover per SKU and flag stockout risk."
+    },
+    {
+      "name": "End-of-day burndown",
+      "command": "eod burndown",
+      "description": "Today's shipments with no label, grouped by warehouse and age, so you can clear the floor before pickup."
+    },
+    {
+      "name": "Orphan finder",
+      "command": "orphans",
+      "description": "Find shipments stuck without a label after N hours, plus optionally cross-check an OMS-side external-ID list against ShipStation shipments."
+    }
+  ]
+}

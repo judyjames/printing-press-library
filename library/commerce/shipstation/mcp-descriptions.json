@@ -1,0 +1,6 @@
+{
+  "descriptions": {
+    "rates_estimate": "Estimate shipping rates across all connected carriers without creating a label. Required body: from_country_code, from_postal_code, from_city_locality, from_state_province, to_country_code, to_postal_code, to_city_locality, to_state_province, weight, ship_date. Returns an array of RatesEstimateItem (one per carrier/service) with estimated_cost and delivery_days. Use this for cheaper, faster cost-comparison previews when you have only origin/destination plus weight; use rates_get for full bound quotes that include carrier IDs and a rate_id you can pass to labels_create.",
+    "environment_delete-webhook": "Delete a webhook subscription by id from the authenticated ShipStation account. Required path: webhook_id (the id returned by environment_list-webhooks). Returns 204 No Content. Destructive and irreversible — the subscription stops receiving event callbacks immediately; use environment_list-webhooks first to confirm the id and event types before calling."
+  }
+}

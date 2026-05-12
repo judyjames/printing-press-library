@@ -1,0 +1,9 @@
+{
+  "timestamp": "2026-05-12T15:36:39.947511Z",
+  "cli_dir": "/Users/jamesbongiovanni/printing-press/.runstate/jamesbongiovanni-99d29618/runs/20260510-114314/working/shipstation-pp-cli",
+  "findings": null,
+  "scorecard_before": {
+    "mcp_description_quality": 9,
+    "captured": "2026-05-12T15:29:53.530238Z"
+  }
+}

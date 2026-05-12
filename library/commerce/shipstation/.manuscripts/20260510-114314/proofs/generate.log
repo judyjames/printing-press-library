@@ -1,0 +1,24 @@
+warning: skipping request body for POST "/v2/batches": contains oneOf/anyOf
+warning: skipping request body for POST "/v2/manifests": contains oneOf/anyOf
+warning: skipping request body for POST "/v2/rates": contains oneOf/anyOf
+warning: skipping request body for POST "/v2/rates/estimate": contains oneOf/anyOf
+warning: spec exposes 101 MCP endpoint tools (>50 threshold). The default
+         endpoint-mirror surface burns agent context at this scale and will
+         score poorly on the scorecard's MCP architectural dimensions. Consider
+         enriching the spec's mcp: block before generation:
+           mcp:
+             transport: [stdio, http]    # remote-capable; reaches hosted agents
+             orchestration: code         # thin <api>_search + <api>_execute pair
+             endpoint_tools: hidden      # suppress raw per-endpoint mirrors
+         See docs/SPEC-EXTENSIONS.md for the full mcp: schema.
+WARNING: spec.Printer is empty; README printer attribution will be omitted. Set `git config github.user` (your GitHub @handle) to populate this correctly before publishing.
+PASS go mod tidy
+PASS govulncheck ./...
+PASS go vet ./...
+PASS go build ./...
+PASS build runnable binary
+PASS shipstation-pp-cli --help
+PASS shipstation-pp-cli version
+PASS shipstation-pp-cli doctor
+Generated shipstation at /Users/jamesbongiovanni/printing-press/.runstate/jamesbongiovanni-99d29618/runs/20260510-114314/working/shipstation-pp-cli
+Bundled /Users/jamesbongiovanni/printing-press/.runstate/jamesbongiovanni-99d29618/runs/20260510-114314/working/shipstation-pp-cli/build/shipstation-pp-mcp-darwin-arm64.mcpb

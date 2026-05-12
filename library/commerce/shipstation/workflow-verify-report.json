@@ -1,0 +1,8 @@
+{
+  "dir": "/Users/jamesbongiovanni/printing-press/.runstate/jamesbongiovanni-99d29618/runs/20260510-114314/working/shipstation-pp-cli",
+  "workflows": null,
+  "verdict": "workflow-pass",
+  "issues": [
+    "no workflow manifest found, skipping"
+  ]
+}

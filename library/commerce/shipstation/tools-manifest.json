@@ -1,0 +1,3670 @@
+{
+  "api_name": "shipstation",
+  "base_url": "https://api.shipstation.com",
+  "description": "",
+  "mcp_ready": "full",
+  "http_transport": "standard",
+  "auth": {
+    "type": "api_key",
+    "header": "api-key",
+    "in": "header",
+    "env_vars": [
+      "SHIPSTATION_API_KEY"
+    ],
+    "env_var_specs": [
+      {
+        "name": "SHIPSTATION_API_KEY",
+        "kind": "per_call",
+        "required": true,
+        "sensitive": true,
+        "inferred": true
+      }
+    ]
+  },
+  "required_headers": [],
+  "tools": [
+    {
+      "name": "batches_create-batch",
+      "description": "Create a batch containing multiple labels. Returns the new CreateBatchResponseBody.",
+      "method": "POST",
+      "path": "/v2/batches",
+      "params": []
+    },
+    {
+      "name": "batches_delete-batch",
+      "description": "Delete a batch based on its batch id. Sets its status to 'archived'. Required: batch_id. Destructive.",
+      "method": "DELETE",
+      "path": "/v2/batches/{batch_id}",
+      "params": [
+        {
+          "name": "batch_id",
+          "type": "string",
+          "location": "path",
+          "description": "Batch ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "batches_get-batch-by-external-id",
+      "description": "Retreive a batch using an external batch ID. Required: external_batch_id. Returns the GetBatchByExternalIdResponseBody.",
+      "method": "GET",
+      "path": "/v2/batches/external_batch_id/{external_batch_id}",
+      "params": [
+        {
+          "name": "external_batch_id",
+          "type": "string",
+          "location": "path",
+          "description": "External batch id",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "batches_get-batch-by-id",
+      "description": "Get batch details for a specific batch id. Required: batch_id. Returns the GetBatchByIdResponseBody.",
+      "method": "GET",
+      "path": "/v2/batches/{batch_id}",
+      "params": [
+        {
+          "name": "batch_id",
+          "type": "string",
+          "location": "path",
+          "description": "Batch ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "batches_list",
+      "description": "List the batches associated with your ShipStation account. Optional: status, page (default: 1), page_size (default: 25) (plus 3 more). Returns the ListBatchesResponseBody.",
+      "method": "GET",
+      "path": "/v2/batches",
+      "params": [
+        {
+          "name": "status",
+          "type": "string",
+          "location": "query",
+          "description": "Status"
+        },
+        {
+          "name": "page",
+          "type": "int",
+          "location": "query",
+          "description": "Return a specific page of results."
+        },
+        {
+          "name": "page_size",
+          "type": "int",
+          "location": "query",
+          "description": "The number of results to return per response."
+        },
+        {
+          "name": "sort_dir",
+          "type": "string",
+          "location": "query",
+          "description": "Controls the sort order of the query."
+        },
+        {
+          "name": "batch_number",
+          "type": "string",
+          "location": "query",
+          "description": "Batch Number"
+        },
+        {
+          "name": "sort_by",
+          "type": "string",
+          "location": "query",
+          "description": "Sort by"
+        }
+      ]
+    },
+    {
+      "name": "batches_update-batch",
+      "description": "Update a batch by id setting its status to 'archived'. Required: batch_id.",
+      "method": "PUT",
+      "path": "/v2/batches/{batch_id}",
+      "params": [
+        {
+          "name": "batch_id",
+          "type": "string",
+          "location": "path",
+          "description": "Batch ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "batches_add_to-batch",
+      "description": "Add a shipment or rate to a batch. Required: batch_id. Optional: batch_notes, external_batch_id, process_labels (plus 2 more).",
+      "method": "POST",
+      "path": "/v2/batches/{batch_id}/add",
+      "params": [
+        {
+          "name": "batch_id",
+          "type": "string",
+          "location": "path",
+          "description": "Batch ID",
+          "required": true
+        },
+        {
+          "name": "batch_notes",
+          "type": "string",
+          "location": "body",
+          "description": "Add custom messages for a particular batch"
+        },
+        {
+          "name": "external_batch_id",
+          "type": "string",
+          "location": "body",
+          "description": "A string that uniquely identifies the external batch"
+        },
+        {
+          "name": "process_labels",
+          "type": "object",
+          "location": "body",
+          "description": "The information used to process the batch"
+        },
+        {
+          "name": "rate_ids",
+          "type": "array",
+          "location": "body",
+          "description": "Array of rate IDs used in the batch"
+        },
+        {
+          "name": "shipment_ids",
+          "type": "array",
+          "location": "body",
+          "description": "Array of shipment IDs used in the batch"
+        }
+      ]
+    },
+    {
+      "name": "batches_errors_list-batch",
+      "description": "Errors in batches must be handled differently from synchronous requests. You must retrieve the status of your batch by getting a batch and getting an overview of the statuses or by listing the batch errors. Required: batch_id. Optional: page (default: 1), pagesize. Returns the ListBatchErrorsResponseBody.",
+      "method": "GET",
+      "path": "/v2/batches/{batch_id}/errors",
+      "params": [
+        {
+          "name": "batch_id",
+          "type": "string",
+          "location": "path",
+          "description": "Batch ID",
+          "required": true
+        },
+        {
+          "name": "page",
+          "type": "int",
+          "location": "query",
+          "description": "Return a specific page of results."
+        },
+        {
+          "name": "pagesize",
+          "type": "int",
+          "location": "query",
+          "description": "Pagesize"
+        }
+      ]
+    },
+    {
+      "name": "batches_process_batch",
+      "description": "Create and purchase the labels for the shipments included in the batch. Required: batch_id. Optional: display_scheme, label_format, label_layout (default: 4x6) (plus 1 more).",
+      "method": "POST",
+      "path": "/v2/batches/{batch_id}/process/labels",
+      "params": [
+        {
+          "name": "batch_id",
+          "type": "string",
+          "location": "path",
+          "description": "Batch ID",
+          "required": true
+        },
+        {
+          "name": "display_scheme",
+          "type": "string",
+          "location": "body",
+          "description": "The display format that the label should be shown in."
+        },
+        {
+          "name": "label_format",
+          "type": "string",
+          "location": "body",
+          "description": "The possible file formats in which shipping labels can be downloaded."
+        },
+        {
+          "name": "label_layout",
+          "type": "string",
+          "location": "body",
+          "description": "Label layout"
+        },
+        {
+          "name": "ship_date",
+          "type": "string",
+          "location": "body",
+          "description": "The Ship date the batch is being processed for"
+        }
+      ]
+    },
+    {
+      "name": "batches_remove_from-batch",
+      "description": "Remove specific shipment ids or rate ids from a batch. Required: batch_id. Optional: rate_ids, shipment_ids.",
+      "method": "POST",
+      "path": "/v2/batches/{batch_id}/remove",
+      "params": [
+        {
+          "name": "batch_id",
+          "type": "string",
+          "location": "path",
+          "description": "Batch ID",
+          "required": true
+        },
+        {
+          "name": "rate_ids",
+          "type": "array",
+          "location": "body",
+          "description": "Array of Rate IDs to be modifed on the batch"
+        },
+        {
+          "name": "shipment_ids",
+          "type": "array",
+          "location": "body",
+          "description": "The Shipment Ids to be modified on the batch"
+        }
+      ]
+    },
+    {
+      "name": "carriers_get-by-id",
+      "description": "Retrive details about a specific carrier by its carrier id. Required: carrier_id. Returns the GetCarrierByIdResponseBody.",
+      "method": "GET",
+      "path": "/v2/carriers/{carrier_id}",
+      "params": [
+        {
+          "name": "carrier_id",
+          "type": "string",
+          "location": "path",
+          "description": "Carrier ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "carriers_list",
+      "description": "List all carriers that have been added to this account. Returns the GetCarriersResponseBody.",
+      "method": "GET",
+      "path": "/v2/carriers",
+      "params": []
+    },
+    {
+      "name": "carriers_options_get-carrier",
+      "description": "Get a list of the options available for a specific carriers. Required: carrier_id. Returns the GetCarrierOptionsResponseBody.",
+      "method": "GET",
+      "path": "/v2/carriers/{carrier_id}/options",
+      "params": [
+        {
+          "name": "carrier_id",
+          "type": "string",
+          "location": "path",
+          "description": "Carrier ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "carriers_packages_list-carrier-types",
+      "description": "List the package types associated with a specific carrier. Required: carrier_id. Returns the ListCarrierPackageTypesResponseBody.",
+      "method": "GET",
+      "path": "/v2/carriers/{carrier_id}/packages",
+      "params": [
+        {
+          "name": "carrier_id",
+          "type": "string",
+          "location": "path",
+          "description": "Carrier ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "carriers_services_list-carrier",
+      "description": "List the services associated with a specific carrier id. Required: carrier_id. Returns the ListCarrierServicesResponseBody.",
+      "method": "GET",
+      "path": "/v2/carriers/{carrier_id}/services",
+      "params": [
+        {
+          "name": "carrier_id",
+          "type": "string",
+          "location": "path",
+          "description": "Carrier ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "downloads_file",
+      "description": "Download labels and other shipment-related documents. Required: subdir, filename, dir. Optional: download, rotation.",
+      "method": "GET",
+      "path": "/v2/downloads/{dir}/{subdir}/{filename}",
+      "params": [
+        {
+          "name": "subdir",
+          "type": "string",
+          "location": "path",
+          "description": "Subdir",
+          "required": true
+        },
+        {
+          "name": "filename",
+          "type": "string",
+          "location": "path",
+          "description": "Filename",
+          "required": true
+        },
+        {
+          "name": "dir",
+          "type": "string",
+          "location": "path",
+          "description": "Dir",
+          "required": true
+        },
+        {
+          "name": "download",
+          "type": "string",
+          "location": "query",
+          "description": "Download"
+        },
+        {
+          "name": "rotation",
+          "type": "int",
+          "location": "query",
+          "description": "Rotation"
+        }
+      ]
+    },
+    {
+      "name": "environment_create-webhook",
+      "description": "Create a webhook for specific events in the environment. Required: event, name, url. Optional: headers, store_id. Returns the new CreateWebhookResponseBody.",
+      "method": "POST",
+      "path": "/v2/environment/webhooks",
+      "params": [
+        {
+          "name": "event",
+          "type": "string",
+          "location": "body",
+          "description": "The possible webhook event values",
+          "required": true
+        },
+        {
+          "name": "headers",
+          "type": "array",
+          "location": "body",
+          "description": "Array of custom webhook headers"
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "location": "body",
+          "description": "The name of the webhook",
+          "required": true
+        },
+        {
+          "name": "store_id",
+          "type": "int",
+          "location": "body",
+          "description": "Store ID"
+        },
+        {
+          "name": "url",
+          "type": "string",
+          "location": "body",
+          "description": "The url that the webhook sends the request to",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "environment_delete-webhook",
+      "description": "Delete webhook by id. Required: webhook_id. Destructive.",
+      "method": "DELETE",
+      "path": "/v2/environment/webhooks/{webhook_id}",
+      "params": [
+        {
+          "name": "webhook_id",
+          "type": "string",
+          "location": "path",
+          "description": "Webhook ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "environment_get-webhook-by-id",
+      "description": "Retrieve individual webhook by an ID. Required: webhook_id. Returns the GetWebhookByIdResponseBody.",
+      "method": "GET",
+      "path": "/v2/environment/webhooks/{webhook_id}",
+      "params": [
+        {
+          "name": "webhook_id",
+          "type": "string",
+          "location": "path",
+          "description": "Webhook ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "environment_list-webhooks",
+      "description": "List all webhooks currently enabled for the account. Returns array of EnvironmentListWebhooksItem.",
+      "method": "GET",
+      "path": "/v2/environment/webhooks",
+      "params": []
+    },
+    {
+      "name": "environment_update-webhook",
+      "description": "Update the webhook url property. Required: webhook_id. Optional: headers, name, url.",
+      "method": "PUT",
+      "path": "/v2/environment/webhooks/{webhook_id}",
+      "params": [
+        {
+          "name": "webhook_id",
+          "type": "string",
+          "location": "path",
+          "description": "Webhook ID",
+          "required": true
+        },
+        {
+          "name": "headers",
+          "type": "array",
+          "location": "body",
+          "description": "Array of custom webhook headers"
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "location": "body",
+          "description": "The name of the webhook"
+        },
+        {
+          "name": "url",
+          "type": "string",
+          "location": "body",
+          "description": "The url that the webhook sends the request"
+        }
+      ]
+    },
+    {
+      "name": "fulfillments_create",
+      "description": "Create one or more fulfillments by marking shipments as shipped with tracking information. This will notify customers and marketplaces according to your configuration. Required: fulfillments. Returns the new FulfillmentsCreateResponse.",
+      "method": "POST",
+      "path": "/v2/fulfillments",
+      "params": [
+        {
+          "name": "fulfillments",
+          "type": "array",
+          "location": "body",
+          "description": "Fulfillments",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "fulfillments_list",
+      "description": "Retrieve a list of fulfillments based on various filter criteria. You can filter by shipment details, tracking information, dates, and more to find the specific fulfillments you need. Optional: ship_to_name, ship_to_country_code, shipment_number (plus 14 more). Returns the FulfillmentsListResponse.",
+      "method": "GET",
+      "path": "/v2/fulfillments",
+      "params": [
+        {
+          "name": "ship_to_name",
+          "type": "string",
+          "location": "query",
+          "description": "Filter by recipient name"
+        },
+        {
+          "name": "ship_to_country_code",
+          "type": "string",
+          "location": "query",
+          "description": "Filter by ship-to country code (2-letter ISO country code)"
+        },
+        {
+          "name": "shipment_number",
+          "type": "string",
+          "location": "query",
+          "description": "Filter by shipment number (order number)"
+        },
+        {
+          "name": "shipment_id",
+          "type": "string",
+          "location": "query",
+          "description": "Filter by specific shipment id"
+        },
+        {
+          "name": "fulfillment_id",
+          "type": "string",
+          "location": "query",
+          "description": "Filter by specific fulfillment id"
+        },
+        {
+          "name": "batch_id",
+          "type": "string",
+          "location": "query",
+          "description": "Filter by batch id"
+        },
+        {
+          "name": "order_source_id",
+          "type": "string",
+          "location": "query",
+          "description": "Filter by order source id (store id)"
+        },
+        {
+          "name": "fulfillment_provider_code",
+          "type": "string",
+          "location": "query",
+          "description": "Filter by fulfillment provider code"
+        },
+        {
+          "name": "tracking_number",
+          "type": "string",
+          "location": "query",
+          "description": "Filter by tracking number"
+        },
+        {
+          "name": "ship_date_start",
+          "type": "string",
+          "location": "query",
+          "description": "Filter by ship date start (inclusive)"
+        },
+        {
+          "name": "ship_date_end",
+          "type": "string",
+          "location": "query",
+          "description": "Filter by ship date end (inclusive)"
+        },
+        {
+          "name": "create_date_start",
+          "type": "string",
+          "location": "query",
+          "description": "Filter by creation date start (inclusive)"
+        },
+        {
+          "name": "create_date_end",
+          "type": "string",
+          "location": "query",
+          "description": "Filter by creation date end (inclusive)"
+        },
+        {
+          "name": "page",
+          "type": "int",
+          "location": "query",
+          "description": "Page number for pagination"
+        },
+        {
+          "name": "page_size",
+          "type": "int",
+          "location": "query",
+          "description": "Number of results per page"
+        },
+        {
+          "name": "sort_dir",
+          "type": "string",
+          "location": "query",
+          "description": "Sort direction"
+        },
+        {
+          "name": "sort_by",
+          "type": "string",
+          "location": "query",
+          "description": "Sort field"
+        }
+      ]
+    },
+    {
+      "name": "inventory_get-levels",
+      "description": "List SKU inventory levels. Optional: sku, inventory_warehouse_id, inventory_location_id (plus 2 more). Returns the InventoryGetLevelsResponse.",
+      "method": "GET",
+      "path": "/v2/inventory",
+      "params": [
+        {
+          "name": "sku",
+          "type": "string",
+          "location": "query",
+          "description": "Optional list of SKUs to filter down to"
+        },
+        {
+          "name": "inventory_warehouse_id",
+          "type": "string",
+          "location": "query",
+          "description": "Inventory warehouse id"
+        },
+        {
+          "name": "inventory_location_id",
+          "type": "string",
+          "location": "query",
+          "description": "Inventory location id"
+        },
+        {
+          "name": "group_by",
+          "type": "string",
+          "location": "query",
+          "description": "Get counts for SKUs across locations or warehouses"
+        },
+        {
+          "name": "page_size",
+          "type": "int",
+          "location": "query",
+          "description": "Page size"
+        }
+      ]
+    },
+    {
+      "name": "inventory_update-skustock-levels",
+      "description": "Update SKU stock levels and related properties. Required: inventory_location_id, quantity, sku, transaction_type. Optional: condition, cost, effective_at (plus 8 more).",
+      "method": "POST",
+      "path": "/v2/inventory",
+      "params": [
+        {
+          "name": "condition",
+          "type": "string",
+          "location": "body",
+          "description": "Condition"
+        },
+        {
+          "name": "cost",
+          "type": "object",
+          "location": "body",
+          "description": "Cost"
+        },
+        {
+          "name": "effective_at",
+          "type": "string",
+          "location": "body",
+          "description": "Effective at"
+        },
+        {
+          "name": "inventory_location_id",
+          "type": "string",
+          "location": "body",
+          "description": "Inventory location id",
+          "required": true
+        },
+        {
+          "name": "lot",
+          "type": "string",
+          "location": "body",
+          "description": "Lot"
+        },
+        {
+          "name": "new_condition",
+          "type": "string",
+          "location": "body",
+          "description": "Used with the modify transaction type to change the condition of existing inventory"
+        },
+        {
+          "name": "new_cost",
+          "type": "object",
+          "location": "body",
+          "description": "Used with the modify transaction type to update the cost of existing inventory"
+        },
+        {
+          "name": "new_inventory_location_id",
+          "type": "string",
+          "location": "body",
+          "description": "Used with the modify transaction type to move inventory to a new location"
+        },
+        {
+          "name": "notes",
+          "type": "string",
+          "location": "body",
+          "description": "Notes"
+        },
+        {
+          "name": "quantity",
+          "type": "int",
+          "location": "body",
+          "description": "Quantity",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "location": "body",
+          "description": "Reason"
+        },
+        {
+          "name": "sku",
+          "type": "string",
+          "location": "body",
+          "description": "Sku",
+          "required": true
+        },
+        {
+          "name": "transaction_type",
+          "type": "string",
+          "location": "body",
+          "description": "The type of update to perform: increment: Increase inventory quantity for specified location. decrement: Decreate inventory quantity for specified location given a set of filters. adjust: Adjust on hand quantity of inventory for specified location to the quantity indicated. This is done by either adding or removing inventory in the condition specified. modify: Modify attributes on specified inventory. The filters work the same as for decrement transaction type.",
+          "required": true
+        },
+        {
+          "name": "usable_end_date",
+          "type": "string",
+          "location": "body",
+          "description": "Usable end date"
+        },
+        {
+          "name": "usable_start_date",
+          "type": "string",
+          "location": "body",
+          "description": "Usable start date"
+        }
+      ]
+    },
+    {
+      "name": "inventory-locations_create",
+      "description": "Create a new inventory location. Required: inventory_warehouse_id, name. Optional: barcode. Returns the new InventoryLocationsCreateResponse.",
+      "method": "POST",
+      "path": "/v2/inventory_locations",
+      "params": [
+        {
+          "name": "barcode",
+          "type": "string",
+          "location": "body",
+          "description": "Physical barcode label for warehouse location bins/shelves used during pick/pack operations. Optional field that accepts any string format."
+        },
+        {
+          "name": "inventory_warehouse_id",
+          "type": "string",
+          "location": "body",
+          "description": "Inventory warehouse id",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "location": "body",
+          "description": "Name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "inventory-locations_delete-by-id",
+      "description": "Delete an inventory location. Required: inventory_location_id. Optional: remove_inventory. Destructive.",
+      "method": "DELETE",
+      "path": "/v2/inventory_locations/{inventory_location_id}",
+      "params": [
+        {
+          "name": "inventory_location_id",
+          "type": "string",
+          "location": "path",
+          "description": "Inventory location id",
+          "required": true
+        },
+        {
+          "name": "remove_inventory",
+          "type": "string",
+          "location": "query",
+          "description": "If 1, remove all inventory from the location before deleting it. If 0 or missing and the location has On Hand inventory, the request will fail."
+        }
+      ]
+    },
+    {
+      "name": "inventory-locations_get-by-id",
+      "description": "Get inventory location by ID. Required: inventory_location_id. Returns the InventoryLocationsGetByIdResponse.",
+      "method": "GET",
+      "path": "/v2/inventory_locations/{inventory_location_id}",
+      "params": [
+        {
+          "name": "inventory_location_id",
+          "type": "string",
+          "location": "path",
+          "description": "Inventory location id",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "inventory-locations_list",
+      "description": "List all inventory locations. Optional: page_size. Returns the InventoryLocationsListResponse.",
+      "method": "GET",
+      "path": "/v2/inventory_locations",
+      "params": [
+        {
+          "name": "page_size",
+          "type": "int",
+          "location": "query",
+          "description": "Page size"
+        }
+      ]
+    },
+    {
+      "name": "inventory-locations_update",
+      "description": "Update an inventory location. Required: inventory_location_id. Optional: barcode, name.",
+      "method": "PUT",
+      "path": "/v2/inventory_locations/{inventory_location_id}",
+      "params": [
+        {
+          "name": "inventory_location_id",
+          "type": "string",
+          "location": "path",
+          "description": "Inventory location id",
+          "required": true
+        },
+        {
+          "name": "barcode",
+          "type": "string",
+          "location": "body",
+          "description": "Physical barcode label for warehouse location bins/shelves used during pick/pack operations. Optional field that accepts any string format."
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "location": "body",
+          "description": "Name"
+        }
+      ]
+    },
+    {
+      "name": "inventory-warehouses_add-new",
+      "description": "Create a new inventory warehouse. Required: name. Returns the new InventoryWarehousesAddNewResponse.",
+      "method": "POST",
+      "path": "/v2/inventory_warehouses",
+      "params": [
+        {
+          "name": "name",
+          "type": "string",
+          "location": "body",
+          "description": "Name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "inventory-warehouses_delete",
+      "description": "Delete an inventory warehouse. Required: inventory_warehouse_id. Optional: remove_inventory. Destructive.",
+      "method": "DELETE",
+      "path": "/v2/inventory_warehouses/{inventory_warehouse_id}",
+      "params": [
+        {
+          "name": "inventory_warehouse_id",
+          "type": "string",
+          "location": "path",
+          "description": "Inventory warehouse id",
+          "required": true
+        },
+        {
+          "name": "remove_inventory",
+          "type": "string",
+          "location": "query",
+          "description": "If 1, remove all inventory from the warehouse before deleting it. If 0 or missing and the warehouse has On Hand inventory, the request will fail."
+        }
+      ]
+    },
+    {
+      "name": "inventory-warehouses_get",
+      "description": "List all inventory warehouses. Optional: page_size. Returns the InventoryWarehousesGetResponse.",
+      "method": "GET",
+      "path": "/v2/inventory_warehouses",
+      "params": [
+        {
+          "name": "page_size",
+          "type": "int",
+          "location": "query",
+          "description": "Page size"
+        }
+      ]
+    },
+    {
+      "name": "inventory-warehouses_get-by-id",
+      "description": "Get a specific inventory warehouse and related properties using its warehouse ID. Required: inventory_warehouse_id. Returns the InventoryWarehousesGetByIdResponse.",
+      "method": "GET",
+      "path": "/v2/inventory_warehouses/{inventory_warehouse_id}",
+      "params": [
+        {
+          "name": "inventory_warehouse_id",
+          "type": "string",
+          "location": "path",
+          "description": "Inventory warehouse id",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "inventory-warehouses_update",
+      "description": "Update an inventory warehouse name. Required: inventory_warehouse_id. Optional: name.",
+      "method": "PUT",
+      "path": "/v2/inventory_warehouses/{inventory_warehouse_id}",
+      "params": [
+        {
+          "name": "inventory_warehouse_id",
+          "type": "string",
+          "location": "path",
+          "description": "Inventory warehouse id",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "location": "body",
+          "description": "Name"
+        }
+      ]
+    },
+    {
+      "name": "labels_create",
+      "description": "Purchase and print a label for shipment. Required: shipment. Optional: alternative_identifiers, batch_id, carrier_code (plus 44 more). Returns the new CreateLabelResponseBody.",
+      "method": "POST",
+      "path": "/v2/labels",
+      "params": [
+        {
+          "name": "alternative_identifiers",
+          "type": "array",
+          "location": "body",
+          "description": "Additional information some carriers may provide by which to identify a given label in their system."
+        },
+        {
+          "name": "batch_id",
+          "type": "string",
+          "location": "body",
+          "description": "If this label was created as part of a [batch], then this is the unique ID of that batch."
+        },
+        {
+          "name": "carrier_code",
+          "type": "string",
+          "location": "body",
+          "description": "The [shipping carrier] who will ship the package, such as `fedex`, `dhl_express`, `stamps_com`, etc."
+        },
+        {
+          "name": "carrier_id",
+          "type": "string",
+          "location": "body",
+          "description": "The unique ID of the [carrier account] that was used to create this label"
+        },
+        {
+          "name": "charge_event",
+          "type": "string",
+          "location": "body",
+          "description": "The label charge event."
+        },
+        {
+          "name": "confirmation",
+          "type": "string",
+          "location": "body",
+          "description": "The type of delivery confirmation that is required for this shipment."
+        },
+        {
+          "name": "created_at",
+          "type": "string",
+          "location": "body",
+          "description": "The date and time that the label was created in ShipStation ."
+        },
+        {
+          "name": "display_scheme",
+          "type": "string",
+          "location": "body",
+          "description": "The display format that the label should be shown in."
+        },
+        {
+          "name": "external_order_id",
+          "type": "string",
+          "location": "body",
+          "description": "ID that the Order Source assigned"
+        },
+        {
+          "name": "external_shipment_id",
+          "type": "string",
+          "location": "body",
+          "description": "A unique user-defined key to identify a shipment. This can be used to retrieve the shipment. \u003e **Warning:** The `external_shipment_id` is limited to 50 characters. Any additional characters will be truncated."
+        },
+        {
+          "name": "form_download",
+          "type": "object",
+          "location": "body",
+          "description": "The link to download the customs form (a.k.a. commercial invoice) for this shipment, if any. Forms are in PDF format. This field is null if the shipment does not require a customs form, or if the carrier does not support it."
+        },
+        {
+          "name": "insurance_claim",
+          "type": "object",
+          "location": "body",
+          "description": "The link to submit an insurance claim for the shipment. This field is null if the shipment is not insured or if the insurance provider does not support online claim submission."
+        },
+        {
+          "name": "insurance_cost",
+          "type": "object",
+          "location": "body",
+          "description": "The insurance cost for this package. Add this to the `shipment_cost` field to get the total cost."
+        },
+        {
+          "name": "is_international",
+          "type": "bool",
+          "location": "body",
+          "description": "Indicates whether this is an international shipment. That is, the originating country and destination country are different."
+        },
+        {
+          "name": "is_return_label",
+          "type": "bool",
+          "location": "body",
+          "description": "Indicates whether this is a return label. You may also want to set the `rma_number` so you know what is being returned."
+        },
+        {
+          "name": "label_download",
+          "type": "object",
+          "location": "body",
+          "description": "Reference to the various downloadable file formats for the generated label"
+        },
+        {
+          "name": "label_download_type",
+          "type": "string",
+          "location": "body",
+          "description": "There are two different ways to [download a label]: |Label Download Type | Description..."
+        },
+        {
+          "name": "label_format",
+          "type": "string",
+          "location": "body",
+          "description": "The file format that you want the label to be in. We recommend `pdf` format because it is supported by all carriers, whereas some carriers do not support the `png` or `zpl` formats."
+        },
+        {
+          "name": "label_id",
+          "type": "string",
+          "location": "body",
+          "description": "A string that uniquely identifies the label. This ID is generated by ShipStation when the label is created."
+        },
+        {
+          "name": "label_image_id",
+          "type": "string",
+          "location": "body",
+          "description": "The label image resource that was used to create a custom label image."
+        },
+        {
+          "name": "label_layout",
+          "type": "string",
+          "location": "body",
+          "description": "The layout (size) that you want the label to be in. The `label_format` determines which sizes are allowed. `4x6` is supported for all label formats, whereas `letter` (8.5' x 11') is only supported for `pdf` format."
+        },
+        {
+          "name": "outbound_label_id",
+          "type": "string",
+          "location": "body",
+          "description": "The `label_id` of the original (outgoing) label that the return label is for. This associates the two labels together, which is required by some carriers."
+        },
+        {
+          "name": "package_code",
+          "type": "string",
+          "location": "body",
+          "description": "The [package type], such as `thick_envelope`, `small_flat_rate_box`, `large_package`, etc. The code `package` indicates a custom or unknown package type."
+        },
+        {
+          "name": "packages",
+          "type": "array",
+          "location": "body",
+          "description": "The label's package(s). \u003e **Note:** Some carriers only allow one package per label. If you attempt to create a multi-package label for a carrier that doesn't allow it, an error will be returned."
+        },
+        {
+          "name": "paperless_download",
+          "type": "object",
+          "location": "body",
+          "description": "The paperless details which may contain elements like `href`, `instructions` and `handoff_code`."
+        },
+        {
+          "name": "qr_code_download",
+          "type": "object",
+          "location": "body",
+          "description": "The QR code download for the package"
+        },
+        {
+          "name": "rate_details",
+          "type": "array",
+          "location": "body",
+          "description": "Rate details"
+        },
+        {
+          "name": "refund_details",
+          "type": "object",
+          "location": "body",
+          "description": "Information about the Refund Assist request for this label. This field is `null` if the label is not eligible for Refund Assist."
+        },
+        {
+          "name": "requested_comparison_amount",
+          "type": "object",
+          "location": "body",
+          "description": "The total shipping cost for the specified comparison_rate_type."
+        },
+        {
+          "name": "rma_number",
+          "type": "string",
+          "location": "body",
+          "description": "An optional Return Merchandise Authorization number. This field is useful for return labels. You can set it to any string value."
+        },
+        {
+          "name": "service_code",
+          "type": "string",
+          "location": "body",
+          "description": "The [carrier service] used to ship the package, such as `fedex_ground`, `usps_first_class_mail`, `flat_rate_envelope`, etc."
+        },
+        {
+          "name": "ship_date",
+          "type": "string",
+          "location": "body",
+          "description": "The date that the package was (or will be) shippped. ShipStation will take the day of week into consideration. For example, if the carrier does not operate on Sundays, then a package that would have shipped on Sunday will ship on Monday instead."
+        },
+        {
+          "name": "ship_from_service_point_id",
+          "type": "string",
+          "location": "body",
+          "description": "A unique identifier for a carrier drop off point where a merchant plans to deliver packages. This will take precedence over a shipment's ship from address."
+        },
+        {
+          "name": "ship_to",
+          "type": "object",
+          "location": "body",
+          "description": "The recipient's mailing address"
+        },
+        {
+          "name": "ship_to_service_point_id",
+          "type": "string",
+          "location": "body",
+          "description": "A unique identifier for a carrier service point where the shipment will be delivered by the carrier. This will take precedence over a shipment's ship to address."
+        },
+        {
+          "name": "shipment",
+          "type": "object",
+          "location": "body",
+          "description": "The shipment information used to generate the label",
+          "required": true
+        },
+        {
+          "name": "shipment_cost",
+          "type": "object",
+          "location": "body",
+          "description": "The cost of shipping, delivery confirmation, and other carrier charges. This amount **does not** include insurance costs."
+        },
+        {
+          "name": "shipment_id",
+          "type": "string",
+          "location": "body",
+          "description": "The shipment that this label is for. ShipStation can create a shipment for you automatically when you [create a label], or you can [create your own shipment] and then [use it to print a label]"
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "location": "body",
+          "description": "The possible statuses that a [shipping label] can be in. |Status |Description |:------------|:----------------------------------------------------- |`processing` |When labels are created in a [batch], it may take a few minutes for all of the labels in the batch to be created. During this period, they will be in `processing` status. |`completed` |The label was successfully created |`error` |The label could not be created due to an error, such as an invalid delivery address |`voided` |The label has been [voided]"
+        },
+        {
+          "name": "test_label",
+          "type": "bool",
+          "location": "body",
+          "description": "Indicate if this label is being used only for testing purposes."
+        },
+        {
+          "name": "trackable",
+          "type": "bool",
+          "location": "body",
+          "description": "Indicates whether the shipment is trackable, in which case the `tracking_status` field will reflect the current status and each package will have a `tracking_number`."
+        },
+        {
+          "name": "tracking_number",
+          "type": "string",
+          "location": "body",
+          "description": "The tracking number for the package. Tracking number formats vary across carriers."
+        },
+        {
+          "name": "tracking_status",
+          "type": "string",
+          "location": "body",
+          "description": "The current status of the package, such as `in_transit` or `delivered`"
+        },
+        {
+          "name": "tracking_url",
+          "type": "string",
+          "location": "body",
+          "description": "The URL to track the package. This URL is provided by the carrier and is unique to the tracking number."
+        },
+        {
+          "name": "validate_address",
+          "type": "string",
+          "location": "body",
+          "description": "The possible validate address values"
+        },
+        {
+          "name": "void_type",
+          "type": "string",
+          "location": "body",
+          "description": "Indicates how the label was voided. This field is `null` if the label has not been voided."
+        },
+        {
+          "name": "voided",
+          "type": "bool",
+          "location": "body",
+          "description": "Indicates whether the label has been [voided]"
+        },
+        {
+          "name": "voided_at",
+          "type": "string",
+          "location": "body",
+          "description": "The date and time that the label was [voided] , or `null` if the label has not been voided"
+        }
+      ]
+    },
+    {
+      "name": "labels_create-from-rate",
+      "description": "When retrieving rates for shipments using the `/rates` endpoint, the returned information contains a `rate_id` property that can be used to generate a label without having to refill in the shipment information repeatedly. Required: rate_id. Optional: display_scheme, label_download_type, label_format (plus 2 more). Returns the new CreateLabelFromRateResponseBody.",
+      "method": "POST",
+      "path": "/v2/labels/rates/{rate_id}",
+      "params": [
+        {
+          "name": "rate_id",
+          "type": "string",
+          "location": "path",
+          "description": "Rate ID",
+          "required": true
+        },
+        {
+          "name": "display_scheme",
+          "type": "string",
+          "location": "body",
+          "description": "The display format that the label should be shown in."
+        },
+        {
+          "name": "label_download_type",
+          "type": "string",
+          "location": "body",
+          "description": "There are two different ways to [download a label]: |Label Download Type | Description..."
+        },
+        {
+          "name": "label_format",
+          "type": "string",
+          "location": "body",
+          "description": "The possible file formats in which shipping labels can be downloaded."
+        },
+        {
+          "name": "label_layout",
+          "type": "string",
+          "location": "body",
+          "description": "The available layouts (sizes) in which shipping labels can be downloaded. The label format determines which sizes are supported. `4x6` is supported for all label formats, whereas `letter` (8.5' x 11') is only supported for `pdf` format."
+        },
+        {
+          "name": "validate_address",
+          "type": "string",
+          "location": "body",
+          "description": "The possible validate address values"
+        }
+      ]
+    },
+    {
+      "name": "labels_create-from-rate-shopper",
+      "description": "Create a label using Rate Shopper to automatically select the best carrier and service based on the specified strategy. For more information about Rate Shopper strategies and use cases, see [Rate Shopping](/rate-shopping#automatic-label-creation-with-rate-shopper). Required: rate_shopper_id (default: cheapest), shipment. Optional: display_scheme (default: label), label_download_type (default: url), label_format (default: pdf) (plus 1 more). Returns the new CreateLabelRateShopperResponseBody.",
+      "method": "POST",
+      "path": "/v2/labels/rate_shopper_id/{rate_shopper_id}",
+      "params": [
+        {
+          "name": "rate_shopper_id",
+          "type": "string",
+          "location": "path",
+          "description": "The rate selection strategy. Determines which carrier and service will be automatically selected: - cheapest: Lowest cost option - fastest: Fastest option at the lowest price - best_value: Lowest cost option arriving within 4 days"
+        },
+        {
+          "name": "display_scheme",
+          "type": "string",
+          "location": "body",
+          "description": "Display scheme"
+        },
+        {
+          "name": "label_download_type",
+          "type": "string",
+          "location": "body",
+          "description": "Specifies how the label should be downloaded. - url: Returns URLs to download the label - inline: Returns the label data inline in the response"
+        },
+        {
+          "name": "label_format",
+          "type": "string",
+          "location": "body",
+          "description": "Label format"
+        },
+        {
+          "name": "label_layout",
+          "type": "string",
+          "location": "body",
+          "description": "Label layout"
+        },
+        {
+          "name": "shipment",
+          "type": "object",
+          "location": "body",
+          "description": "Shipment details. Must NOT include carrier_id, service_code, or shipping_rule_id as Rate Shopper selects these automatically.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "labels_create-from-shipment",
+      "description": "Purchase a label using a shipment ID that has already been created with the desired address and package info. Required: shipment_id. Optional: display_scheme, label_download_type, label_format (plus 2 more). Returns the new CreateLabelFromShipmentResponseBody.",
+      "method": "POST",
+      "path": "/v2/labels/shipment/{shipment_id}",
+      "params": [
+        {
+          "name": "shipment_id",
+          "type": "string",
+          "location": "path",
+          "description": "Shipment ID",
+          "required": true
+        },
+        {
+          "name": "display_scheme",
+          "type": "string",
+          "location": "body",
+          "description": "The display format that the label should be shown in."
+        },
+        {
+          "name": "label_download_type",
+          "type": "string",
+          "location": "body",
+          "description": "There are two different ways to [download a label]: |Label Download Type | Description..."
+        },
+        {
+          "name": "label_format",
+          "type": "string",
+          "location": "body",
+          "description": "The possible file formats in which shipping labels can be downloaded."
+        },
+        {
+          "name": "label_layout",
+          "type": "string",
+          "location": "body",
+          "description": "The available layouts (sizes) in which shipping labels can be downloaded. The label format determines which sizes are supported. `4x6` is supported for all label formats, whereas `letter` (8.5' x 11') is only supported for `pdf` format."
+        },
+        {
+          "name": "validate_address",
+          "type": "string",
+          "location": "body",
+          "description": "The possible validate address values"
+        }
+      ]
+    },
+    {
+      "name": "labels_get-by-external-shipment-id",
+      "description": "Find a label by using the external shipment id that was used during label creation. \u003e **Warning:** This endpoint returns only the first label found with the specified `external_shipment_id`. If multiple labels share the same `external_shipment_id`, only the earliest created label will be returned. To retrieve all labels with a specific `external_shipment_id`, use the [list labels endpoint](#operation/list_labels) with the `external_shipment_id` query parameter. Required: external_shipment_id. Optional: label_download_type.",
+      "method": "GET",
+      "path": "/v2/labels/external_shipment_id/{external_shipment_id}",
+      "params": [
+        {
+          "name": "external_shipment_id",
+          "type": "string",
+          "location": "path",
+          "description": "External shipment id",
+          "required": true
+        },
+        {
+          "name": "label_download_type",
+          "type": "string",
+          "location": "query",
+          "description": "Label download type"
+        }
+      ]
+    },
+    {
+      "name": "labels_get-by-id",
+      "description": "Retrieve a specific label by its label id. Required: label_id. Optional: label_download_type. Returns the GetLabelByIdResponseBody.",
+      "method": "GET",
+      "path": "/v2/labels/{label_id}",
+      "params": [
+        {
+          "name": "label_id",
+          "type": "string",
+          "location": "path",
+          "description": "Label ID",
+          "required": true
+        },
+        {
+          "name": "label_download_type",
+          "type": "string",
+          "location": "query",
+          "description": "Label download type"
+        }
+      ]
+    },
+    {
+      "name": "labels_list",
+      "description": "This method returns a list of labels that you've created. You can optionally filter the results as well as control their sort order and the number of results returned at a time. By default all labels are returned 25 at a time, starting with the most recently created ones. You can combine multiple filter options to narrow-down the results. For example, if you only want your UPS labels for your east coast warehouse you could query by both `warehouse_id` and `carrier_id`. Optional: label_status, service_code, carrier_id (plus 13 more).",
+      "method": "GET",
+      "path": "/v2/labels",
+      "params": [
+        {
+          "name": "label_status",
+          "type": "string",
+          "location": "query",
+          "description": "Only return labels that are currently in the specified status."
+        },
+        {
+          "name": "service_code",
+          "type": "string",
+          "location": "query",
+          "description": "Only return labels for a specific carrier service."
+        },
+        {
+          "name": "carrier_id",
+          "type": "string",
+          "location": "query",
+          "description": "Carrier ID"
+        },
+        {
+          "name": "tracking_number",
+          "type": "string",
+          "location": "query",
+          "description": "The tracking number associated with a shipment"
+        },
+        {
+          "name": "batch_id",
+          "type": "string",
+          "location": "query",
+          "description": "Batch ID"
+        },
+        {
+          "name": "rate_id",
+          "type": "string",
+          "location": "query",
+          "description": "Rate ID"
+        },
+        {
+          "name": "shipment_id",
+          "type": "string",
+          "location": "query",
+          "description": "Shipment ID"
+        },
+        {
+          "name": "external_shipment_id",
+          "type": "string",
+          "location": "query",
+          "description": "Filter labels by external shipment ID."
+        },
+        {
+          "name": "warehouse_id",
+          "type": "string",
+          "location": "query",
+          "description": "Warehouse ID"
+        },
+        {
+          "name": "created_at_start",
+          "type": "string",
+          "location": "query",
+          "description": "Used to create a filter for when a resource was created (ex."
+        },
+        {
+          "name": "created_at_end",
+          "type": "string",
+          "location": "query",
+          "description": "Used to create a filter for when a resource was created, (ex."
+        },
+        {
+          "name": "refund_status",
+          "type": "array",
+          "location": "query",
+          "description": "Refund status"
+        },
+        {
+          "name": "page",
+          "type": "int",
+          "location": "query",
+          "description": "Return a specific page of results."
+        },
+        {
+          "name": "page_size",
+          "type": "int",
+          "location": "query",
+          "description": "The number of results to return per response."
+        },
+        {
+          "name": "sort_dir",
+          "type": "string",
+          "location": "query",
+          "description": "Controls the sort order of the query."
+        },
+        {
+          "name": "sort_by",
+          "type": "string",
+          "location": "query",
+          "description": "Controls which field the query is sorted by."
+        }
+      ]
+    },
+    {
+      "name": "labels_cancel-refund_cancel-label-refund",
+      "description": "Cancel a scheduled refund request for a label. Only labels with refund status 'request_scheduled' can be excluded from an upcoming refund request. Required: label_id. Returns the new Label.",
+      "method": "POST",
+      "path": "/v2/labels/{label_id}/cancel_refund",
+      "params": [
+        {
+          "name": "label_id",
+          "type": "string",
+          "location": "path",
+          "description": "Label ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "labels_return_create-label",
+      "description": "Create a return label for a previously created outbound label. The return label will automatically swap the ship to and ship from addresses from the original label. Required: label_id. Optional: charge_event, display_scheme, label_download_type (plus 3 more). Returns the new CreateReturnLabelResponseBody.",
+      "method": "POST",
+      "path": "/v2/labels/{label_id}/return",
+      "params": [
+        {
+          "name": "label_id",
+          "type": "string",
+          "location": "path",
+          "description": "Label ID",
+          "required": true
+        },
+        {
+          "name": "charge_event",
+          "type": "string",
+          "location": "body",
+          "description": "The label charge event."
+        },
+        {
+          "name": "display_scheme",
+          "type": "string",
+          "location": "body",
+          "description": "The display format that the label should be shown in."
+        },
+        {
+          "name": "label_download_type",
+          "type": "string",
+          "location": "body",
+          "description": "There are two different ways to [download a label]: |Label Download Type | Description..."
+        },
+        {
+          "name": "label_format",
+          "type": "string",
+          "location": "body",
+          "description": "The file format that you want the label to be in. We recommend `pdf` format because it is supported by all carriers, whereas some carriers do not support the `png` or `zpl` formats."
+        },
+        {
+          "name": "label_image_id",
+          "type": "string",
+          "location": "body",
+          "description": "The label image resource that was used to create a custom label image."
+        },
+        {
+          "name": "label_layout",
+          "type": "string",
+          "location": "body",
+          "description": "The layout (size) that you want the label to be in. The `label_format` determines which sizes are allowed. `4x6` is supported for all label formats, whereas `letter` (8.5' x 11') is only supported for `pdf` format."
+        }
+      ]
+    },
+    {
+      "name": "labels_track_get-tracking-log-from-label",
+      "description": "Retrieve the label's tracking details. Required: label_id. Returns the GetTrackingLogFromLabelResponseBody.",
+      "method": "GET",
+      "path": "/v2/labels/{label_id}/track",
+      "params": [
+        {
+          "name": "label_id",
+          "type": "string",
+          "location": "path",
+          "description": "Label ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "labels_void_label",
+      "description": "Void a specific label using its label id. For labels that are paid for at time of label creation, this will also request a refund from the carrier. Required: label_id. Returns the updated VoidLabelResponseBody.",
+      "method": "PUT",
+      "path": "/v2/labels/{label_id}/void",
+      "params": [
+        {
+          "name": "label_id",
+          "type": "string",
+          "location": "path",
+          "description": "Label ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "mailing_create-envelope",
+      "description": "Create a single envelope shipment. Required: label_layout, shipment. Optional: charge_event, display_scheme, is_return_label (default: false) (plus 9 more). Returns the new CreateLabelResponseBody.",
+      "method": "POST",
+      "path": "/v2/mailing/envelopes",
+      "params": [
+        {
+          "name": "charge_event",
+          "type": "string",
+          "location": "body",
+          "description": "The label charge event."
+        },
+        {
+          "name": "display_scheme",
+          "type": "string",
+          "location": "body",
+          "description": "The display format that the label should be shown in."
+        },
+        {
+          "name": "is_return_label",
+          "type": "bool",
+          "location": "body",
+          "description": "Indicates whether this is a return label."
+        },
+        {
+          "name": "label_download_type",
+          "type": "string",
+          "location": "body",
+          "description": "There are two different ways to [download a label]: |Label Download Type | Description..."
+        },
+        {
+          "name": "label_format",
+          "type": "string",
+          "location": "body",
+          "description": "The file format for the label."
+        },
+        {
+          "name": "label_image_id",
+          "type": "string",
+          "location": "body",
+          "description": "The label image resource that was used to create a custom label image."
+        },
+        {
+          "name": "label_layout",
+          "type": "string",
+          "location": "body",
+          "description": "The envelope layout to use.",
+          "required": true
+        },
+        {
+          "name": "outbound_label_id",
+          "type": "string",
+          "location": "body",
+          "description": "The `label_id` of the original (outgoing) label that the return label is for."
+        },
+        {
+          "name": "rma_number",
+          "type": "string",
+          "location": "body",
+          "description": "An optional Return Merchandise Authorization number for return labels."
+        },
+        {
+          "name": "ship_from_service_point_id",
+          "type": "string",
+          "location": "body",
+          "description": "A unique identifier for a carrier drop off point where a merchant plans to deliver packages."
+        },
+        {
+          "name": "ship_to_service_point_id",
+          "type": "string",
+          "location": "body",
+          "description": "A unique identifier for a carrier service point where the shipment will be delivered."
+        },
+        {
+          "name": "shipment",
+          "type": "object",
+          "location": "body",
+          "description": "The shipment information used to generate the envelope label.",
+          "required": true
+        },
+        {
+          "name": "test_label",
+          "type": "bool",
+          "location": "body",
+          "description": "Indicate if this label is being used only for testing purposes."
+        },
+        {
+          "name": "validate_address",
+          "type": "string",
+          "location": "body",
+          "description": "The possible validate address values"
+        }
+      ]
+    },
+    {
+      "name": "mailing_create-labels",
+      "description": "Create one or more mailing labels on a sheet layout. Use `mailing_options` to control which row and column to start printing from. Required: label_layout, mailing_options, shipments. Optional: charge_event, display_scheme, is_return_label (default: false) (plus 9 more). Returns the new MultiLabelResponseBody.",
+      "method": "POST",
+      "path": "/v2/mailing/mail_labels",
+      "params": [
+        {
+          "name": "charge_event",
+          "type": "string",
+          "location": "body",
+          "description": "The label charge event."
+        },
+        {
+          "name": "display_scheme",
+          "type": "string",
+          "location": "body",
+          "description": "The display format that the label should be shown in."
+        },
+        {
+          "name": "is_return_label",
+          "type": "bool",
+          "location": "body",
+          "description": "Indicates whether these are return labels."
+        },
+        {
+          "name": "label_download_type",
+          "type": "string",
+          "location": "body",
+          "description": "There are two different ways to [download a label]: |Label Download Type | Description..."
+        },
+        {
+          "name": "label_format",
+          "type": "string",
+          "location": "body",
+          "description": "The file format for the label."
+        },
+        {
+          "name": "label_image_id",
+          "type": "string",
+          "location": "body",
+          "description": "The label image resource that was used to create a custom label image."
+        },
+        {
+          "name": "label_layout",
+          "type": "string",
+          "location": "body",
+          "description": "The mail label layout to use.",
+          "required": true
+        },
+        {
+          "name": "mailing_options",
+          "type": "object",
+          "location": "body",
+          "description": "Layout options for printing mail labels on a single sheet. Controls the starting position on the label sheet.",
+          "required": true
+        },
+        {
+          "name": "outbound_label_id",
+          "type": "string",
+          "location": "body",
+          "description": "The `label_id` of the original (outgoing) label that the return label is for."
+        },
+        {
+          "name": "rma_number",
+          "type": "string",
+          "location": "body",
+          "description": "An optional Return Merchandise Authorization number for return labels."
+        },
+        {
+          "name": "ship_from_service_point_id",
+          "type": "string",
+          "location": "body",
+          "description": "A unique identifier for a carrier drop off point where a merchant plans to deliver packages."
+        },
+        {
+          "name": "ship_to_service_point_id",
+          "type": "string",
+          "location": "body",
+          "description": "A unique identifier for a carrier service point where the shipment will be delivered."
+        },
+        {
+          "name": "shipments",
+          "type": "array",
+          "location": "body",
+          "description": "The shipments to create mail labels for. All shipments must use the same `carrier_id`.",
+          "required": true
+        },
+        {
+          "name": "test_label",
+          "type": "bool",
+          "location": "body",
+          "description": "Indicate if this label is being used only for testing purposes."
+        },
+        {
+          "name": "validate_address",
+          "type": "string",
+          "location": "body",
+          "description": "The possible validate address values"
+        }
+      ]
+    },
+    {
+      "name": "mailing_create-netstamps",
+      "description": "Create one or more NetStamps. Each shipment in the request produces an individual stamp with optional row/column positioning via `advanced_options.netstamps_options`. Required: label_layout, shipments. Optional: charge_event, display_scheme, is_return_label (default: false) (plus 9 more). Returns the new MultiLabelResponseBody.",
+      "method": "POST",
+      "path": "/v2/mailing/netstamps",
+      "params": [
+        {
+          "name": "charge_event",
+          "type": "string",
+          "location": "body",
+          "description": "The label charge event."
+        },
+        {
+          "name": "display_scheme",
+          "type": "string",
+          "location": "body",
+          "description": "The display format that the label should be shown in."
+        },
+        {
+          "name": "is_return_label",
+          "type": "bool",
+          "location": "body",
+          "description": "Indicates whether these are return labels."
+        },
+        {
+          "name": "label_download_type",
+          "type": "string",
+          "location": "body",
+          "description": "There are two different ways to [download a label]: |Label Download Type | Description..."
+        },
+        {
+          "name": "label_format",
+          "type": "string",
+          "location": "body",
+          "description": "The file format for the label."
+        },
+        {
+          "name": "label_image_id",
+          "type": "string",
+          "location": "body",
+          "description": "The label image resource that was used to create a custom label image."
+        },
+        {
+          "name": "label_layout",
+          "type": "string",
+          "location": "body",
+          "description": "The NetStamps layout to use.",
+          "required": true
+        },
+        {
+          "name": "outbound_label_id",
+          "type": "string",
+          "location": "body",
+          "description": "The `label_id` of the original (outgoing) label that the return label is for."
+        },
+        {
+          "name": "rma_number",
+          "type": "string",
+          "location": "body",
+          "description": "An optional Return Merchandise Authorization number for return labels."
+        },
+        {
+          "name": "ship_from_service_point_id",
+          "type": "string",
+          "location": "body",
+          "description": "A unique identifier for a carrier drop off point where a merchant plans to deliver packages."
+        },
+        {
+          "name": "ship_to_service_point_id",
+          "type": "string",
+          "location": "body",
+          "description": "A unique identifier for a carrier service point where the shipment will be delivered."
+        },
+        {
+          "name": "shipments",
+          "type": "array",
+          "location": "body",
+          "description": "The shipments to create NetStamps labels for. All shipments must use the same `carrier_id`. Each shipment must include `advanced_options.netstamps_options` with `row` and `column` to control stamp placement. Row/column combinations must be unique across shipments.",
+          "required": true
+        },
+        {
+          "name": "test_label",
+          "type": "bool",
+          "location": "body",
+          "description": "Indicate if this label is being used only for testing purposes."
+        },
+        {
+          "name": "validate_address",
+          "type": "string",
+          "location": "body",
+          "description": "The possible validate address values"
+        }
+      ]
+    },
+    {
+      "name": "manifests_create",
+      "description": "Each ShipStation manifest is created for a specific warehouse, so you'll need to provide the warehouse_id rather than the ship_from address. You can create a warehouse for each location that you want to create manifests for. Returns the new CreateManifestResponseBody.",
+      "method": "POST",
+      "path": "/v2/manifests",
+      "params": []
+    },
+    {
+      "name": "manifests_get-by-id",
+      "description": "Get Manifest By Id. Required: manifest_id. Returns the GetManifestByIdResponseBody.",
+      "method": "GET",
+      "path": "/v2/manifests/{manifest_id}",
+      "params": [
+        {
+          "name": "manifest_id",
+          "type": "string",
+          "location": "path",
+          "description": "The Manifest Id",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "manifests_list",
+      "description": "Similar to querying shipments, we allow you to query manifests since there will likely be a large number over a long period of time. Optional: warehouse_id, ship_date_start, ship_date_end (plus 6 more). Returns the ListManifestsResponseBody.",
+      "method": "GET",
+      "path": "/v2/manifests",
+      "params": [
+        {
+          "name": "warehouse_id",
+          "type": "string",
+          "location": "query",
+          "description": "Warehouse ID"
+        },
+        {
+          "name": "ship_date_start",
+          "type": "string",
+          "location": "query",
+          "description": "ship date start range"
+        },
+        {
+          "name": "ship_date_end",
+          "type": "string",
+          "location": "query",
+          "description": "ship date end range"
+        },
+        {
+          "name": "created_at_start",
+          "type": "string",
+          "location": "query",
+          "description": "Used to create a filter for when a resource was created (ex."
+        },
+        {
+          "name": "created_at_end",
+          "type": "string",
+          "location": "query",
+          "description": "Used to create a filter for when a resource was created, (ex."
+        },
+        {
+          "name": "carrier_id",
+          "type": "string",
+          "location": "query",
+          "description": "Carrier ID"
+        },
+        {
+          "name": "page",
+          "type": "int",
+          "location": "query",
+          "description": "Return a specific page of results."
+        },
+        {
+          "name": "page_size",
+          "type": "int",
+          "location": "query",
+          "description": "The number of results to return per response."
+        },
+        {
+          "name": "label_ids",
+          "type": "array",
+          "location": "query",
+          "description": "Label ids"
+        }
+      ]
+    },
+    {
+      "name": "packages_create-type",
+      "description": "Create a custom package type to better assist in getting accurate rate estimates. Required: name, package_code. Optional: description, dimensions, package_id. Returns the new CreatePackageTypeResponseBody.",
+      "method": "POST",
+      "path": "/v2/packages",
+      "params": [
+        {
+          "name": "description",
+          "type": "string",
+          "location": "body",
+          "description": "Provides a helpful description for the custom package."
+        },
+        {
+          "name": "dimensions",
+          "type": "object",
+          "location": "body",
+          "description": "The custom dimensions for the package."
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "location": "body",
+          "description": "Name",
+          "required": true
+        },
+        {
+          "name": "package_code",
+          "type": "string",
+          "location": "body",
+          "description": "A [package type] , such as `thick_envelope`, `small_flat_rate_box`, `large_package`, etc. Use the code `package` for custom or unknown package types.",
+          "required": true
+        },
+        {
+          "name": "package_id",
+          "type": "string",
+          "location": "body",
+          "description": "A string that uniquely identifies the package."
+        }
+      ]
+    },
+    {
+      "name": "packages_delete-typ",
+      "description": "Delete a custom package using the ID. Required: package_id. Destructive.",
+      "method": "DELETE",
+      "path": "/v2/packages/{package_id}",
+      "params": [
+        {
+          "name": "package_id",
+          "type": "string",
+          "location": "path",
+          "description": "Package ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "packages_get-type-by-id",
+      "description": "Get Custom Package Type by ID. Required: package_id. Returns the GetPackageTypeByIdResponseBody.",
+      "method": "GET",
+      "path": "/v2/packages/{package_id}",
+      "params": [
+        {
+          "name": "package_id",
+          "type": "string",
+          "location": "path",
+          "description": "Package ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "packages_list-types",
+      "description": "List the custom package types associated with the account. Returns the ListPackageTypesResponseBody.",
+      "method": "GET",
+      "path": "/v2/packages",
+      "params": []
+    },
+    {
+      "name": "packages_update-type",
+      "description": "Update the custom package type object by ID. Required: package_id, name, package_code. Optional: description, dimensions.",
+      "method": "PUT",
+      "path": "/v2/packages/{package_id}",
+      "params": [
+        {
+          "name": "package_id",
+          "type": "string",
+          "location": "path",
+          "description": "Package ID",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "location": "body",
+          "description": "Provides a helpful description for the custom package."
+        },
+        {
+          "name": "dimensions",
+          "type": "object",
+          "location": "body",
+          "description": "The custom dimensions for the package."
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "location": "body",
+          "description": "Name",
+          "required": true
+        },
+        {
+          "name": "package_code",
+          "type": "string",
+          "location": "body",
+          "description": "A [package type] , such as `thick_envelope`, `small_flat_rate_box`, `large_package`, etc. Use the code `package` for custom or unknown package types.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "pickups_delete-scheduled",
+      "description": "Delete a previously-scheduled pickup by ID. Required: pickup_id. Returns the DeletePickupByIdResponseBody. Destructive.",
+      "method": "DELETE",
+      "path": "/v2/pickups/{pickup_id}",
+      "params": [
+        {
+          "name": "pickup_id",
+          "type": "string",
+          "location": "path",
+          "description": "Pickup id",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "pickups_get-by-id",
+      "description": "Get Pickup By ID. Required: pickup_id. Returns the GetPickupByIdResponseBody.",
+      "method": "GET",
+      "path": "/v2/pickups/{pickup_id}",
+      "params": [
+        {
+          "name": "pickup_id",
+          "type": "string",
+          "location": "path",
+          "description": "Pickup id",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "pickups_list-scheduled",
+      "description": "List all pickups that have been scheduled for this carrier. Optional: carrier_id, warehouse_id, created_at_start (plus 3 more). Returns the GetPickupsResponseBody.",
+      "method": "GET",
+      "path": "/v2/pickups",
+      "params": [
+        {
+          "name": "carrier_id",
+          "type": "string",
+          "location": "query",
+          "description": "Carrier ID"
+        },
+        {
+          "name": "warehouse_id",
+          "type": "string",
+          "location": "query",
+          "description": "Warehouse ID"
+        },
+        {
+          "name": "created_at_start",
+          "type": "string",
+          "location": "query",
+          "description": "Used to create a filter for when a resource was created (ex."
+        },
+        {
+          "name": "created_at_end",
+          "type": "string",
+          "location": "query",
+          "description": "Used to create a filter for when a resource was created, (ex."
+        },
+        {
+          "name": "page",
+          "type": "int",
+          "location": "query",
+          "description": "Return a specific page of results."
+        },
+        {
+          "name": "page_size",
+          "type": "int",
+          "location": "query",
+          "description": "The number of results to return per response."
+        }
+      ]
+    },
+    {
+      "name": "pickups_schedule",
+      "description": "Schedule a package pickup with a carrier. Required: contact_details, label_ids, pickup_window. Optional: cancelled_at, carrier_id, confirmation_number (plus 6 more). Returns the new SchedulePickupResponseBody.",
+      "method": "POST",
+      "path": "/v2/pickups",
+      "params": [
+        {
+          "name": "cancelled_at",
+          "type": "string",
+          "location": "body",
+          "description": "The date and time that the pickup was cancelled in ShipStation ."
+        },
+        {
+          "name": "carrier_id",
+          "type": "string",
+          "location": "body",
+          "description": "The carrier_id associated with the pickup"
+        },
+        {
+          "name": "confirmation_number",
+          "type": "string",
+          "location": "body",
+          "description": "The carrier confirmation number for the scheduled pickup."
+        },
+        {
+          "name": "contact_details",
+          "type": "object",
+          "location": "body",
+          "description": "Contact details",
+          "required": true
+        },
+        {
+          "name": "created_at",
+          "type": "string",
+          "location": "body",
+          "description": "The date and time that the pickup was created in ShipStation ."
+        },
+        {
+          "name": "label_ids",
+          "type": "array",
+          "location": "body",
+          "description": "Label IDs that will be included in the pickup request",
+          "required": true
+        },
+        {
+          "name": "pickup_address",
+          "type": "object",
+          "location": "body",
+          "description": "Any residential or business mailing address, anywhere in the world. \u003e **Note:** Either `name` or `company_name` must be set. Both may be specified, if relevant."
+        },
+        {
+          "name": "pickup_id",
+          "type": "string",
+          "location": "body",
+          "description": "Pickup Resource ID"
+        },
+        {
+          "name": "pickup_notes",
+          "type": "string",
+          "location": "body",
+          "description": "Used by some carriers to give special instructions for a package pickup"
+        },
+        {
+          "name": "pickup_window",
+          "type": "object",
+          "location": "body",
+          "description": "The desired time range for the package pickup.",
+          "required": true
+        },
+        {
+          "name": "pickup_windows",
+          "type": "array",
+          "location": "body",
+          "description": "An array of available pickup windows. Carriers can return multiple times that they will pickup packages."
+        },
+        {
+          "name": "warehouse_id",
+          "type": "string",
+          "location": "body",
+          "description": "The warehouse_id associated with the pickup"
+        }
+      ]
+    },
+    {
+      "name": "products_list",
+      "description": "List products. Optional: sku, name, active (plus 2 more). Returns the ProductsListResponse.",
+      "method": "GET",
+      "path": "/v2/products",
+      "params": [
+        {
+          "name": "sku",
+          "type": "string",
+          "location": "query",
+          "description": "Filter products by SKU"
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "location": "query",
+          "description": "Filter products by name"
+        },
+        {
+          "name": "active",
+          "type": "bool",
+          "location": "query",
+          "description": "Filter products by active status"
+        },
+        {
+          "name": "page_size",
+          "type": "int",
+          "location": "query",
+          "description": "The number of results to return per page"
+        },
+        {
+          "name": "page",
+          "type": "int",
+          "location": "query",
+          "description": "The page number to return"
+        }
+      ]
+    },
+    {
+      "name": "purchase-orders_create",
+      "description": "Create a new purchase order with products from a supplier. Required: products, supplier_id, warehouse_id. Optional: currency_code (default: USD), expected_delivery_date, note_to_supplier (plus 6 more). Returns the new PurchaseOrdersCreateResponse.",
+      "method": "POST",
+      "path": "/v2/purchase_orders",
+      "params": [
+        {
+          "name": "currency_code",
+          "type": "string",
+          "location": "body",
+          "description": "ISO 4217 currency code"
+        },
+        {
+          "name": "expected_delivery_date",
+          "type": "string",
+          "location": "body",
+          "description": "Expected delivery date"
+        },
+        {
+          "name": "note_to_supplier",
+          "type": "string",
+          "location": "body",
+          "description": "Note to include for the supplier"
+        },
+        {
+          "name": "order_date",
+          "type": "string",
+          "location": "body",
+          "description": "Date when the order was placed"
+        },
+        {
+          "name": "payment_status",
+          "type": "string",
+          "location": "body",
+          "description": "Payment status for the order"
+        },
+        {
+          "name": "payment_terms",
+          "type": "string",
+          "location": "body",
+          "description": "Payment terms for the order"
+        },
+        {
+          "name": "products",
+          "type": "array",
+          "location": "body",
+          "description": "List of products in the purchase order",
+          "required": true
+        },
+        {
+          "name": "reference_number",
+          "type": "string",
+          "location": "body",
+          "description": "Optional reference number"
+        },
+        {
+          "name": "shipping_carrier",
+          "type": "string",
+          "location": "body",
+          "description": "Shipping carrier name"
+        },
+        {
+          "name": "supplier_id",
+          "type": "string",
+          "location": "body",
+          "description": "Supplier identifier",
+          "required": true
+        },
+        {
+          "name": "tracking_number",
+          "type": "string",
+          "location": "body",
+          "description": "Tracking number for the shipment"
+        },
+        {
+          "name": "warehouse_id",
+          "type": "string",
+          "location": "body",
+          "description": "Warehouse identifier",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "purchase-orders_get",
+      "description": "Retrieve detailed information about a specific purchase order including all products. Required: purchase_order_id. Returns the PurchaseOrdersGetResponse.",
+      "method": "GET",
+      "path": "/v2/purchase_orders/{purchase_order_id}",
+      "params": [
+        {
+          "name": "purchase_order_id",
+          "type": "string",
+          "location": "path",
+          "description": "The purchase order identifier",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "purchase-orders_list",
+      "description": "Retrieve a paginated list of purchase orders with optional filtering by status, warehouse, dates, and other criteria. Optional: order_number, status, warehouse_id (plus 3 more). Returns the PurchaseOrdersListResponse.",
+      "method": "GET",
+      "path": "/v2/purchase_orders",
+      "params": [
+        {
+          "name": "order_number",
+          "type": "string",
+          "location": "query",
+          "description": "Filter by order number"
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "location": "query",
+          "description": "Filter by status"
+        },
+        {
+          "name": "warehouse_id",
+          "type": "string",
+          "location": "query",
+          "description": "Filter by warehouse ID"
+        },
+        {
+          "name": "reference_number",
+          "type": "string",
+          "location": "query",
+          "description": "Filter by reference number"
+        },
+        {
+          "name": "create_date_start",
+          "type": "string",
+          "location": "query",
+          "description": "Filter by creation date start (inclusive)"
+        },
+        {
+          "name": "page_size",
+          "type": "int",
+          "location": "query",
+          "description": "Number of results per page"
+        }
+      ]
+    },
+    {
+      "name": "purchase-orders_update",
+      "description": "Update an existing purchase order. Editing limitations: - In the `draft` status, all fields can be edited. - Once a purchase order moves to any other status (open, receiving, received, cancelled, or closed), updating via PUT is no longer allowed. - For purchase orders in `open` status, use the POST /v2/purchase_orders/{purchase_order_id}/shipping_details endpoint to update shipping-related details. Required: purchase_order_id, products, supplier_id, warehouse_id. Optional: currency_code, expected_delivery_date, note_to_supplier (plus 6 more). Returns the updated PurchaseOrdersUpdateResponse.",
+      "method": "PUT",
+      "path": "/v2/purchase_orders/{purchase_order_id}",
+      "params": [
+        {
+          "name": "purchase_order_id",
+          "type": "string",
+          "location": "path",
+          "description": "The purchase order identifier",
+          "required": true
+        },
+        {
+          "name": "currency_code",
+          "type": "string",
+          "location": "body",
+          "description": "Currency code"
+        },
+        {
+          "name": "expected_delivery_date",
+          "type": "string",
+          "location": "body",
+          "description": "Expected delivery date"
+        },
+        {
+          "name": "note_to_supplier",
+          "type": "string",
+          "location": "body",
+          "description": "Note to supplier"
+        },
+        {
+          "name": "order_date",
+          "type": "string",
+          "location": "body",
+          "description": "Order date"
+        },
+        {
+          "name": "payment_status",
+          "type": "string",
+          "location": "body",
+          "description": "Payment status"
+        },
+        {
+          "name": "payment_terms",
+          "type": "string",
+          "location": "body",
+          "description": "Payment terms"
+        },
+        {
+          "name": "products",
+          "type": "array",
+          "location": "body",
+          "description": "Products",
+          "required": true
+        },
+        {
+          "name": "reference_number",
+          "type": "string",
+          "location": "body",
+          "description": "Reference number"
+        },
+        {
+          "name": "shipping_carrier",
+          "type": "string",
+          "location": "body",
+          "description": "Shipping carrier"
+        },
+        {
+          "name": "supplier_id",
+          "type": "string",
+          "location": "body",
+          "description": "Supplier id",
+          "required": true
+        },
+        {
+          "name": "tracking_number",
+          "type": "string",
+          "location": "body",
+          "description": "Tracking number"
+        },
+        {
+          "name": "warehouse_id",
+          "type": "string",
+          "location": "body",
+          "description": "Warehouse id",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "purchase-orders_documents_get-purchase-order-received-summary-pdf",
+      "description": "Download a PDF document containing the received products summary. Available for purchase orders with status: receiving, received, or closed. Required: purchase_order_id.",
+      "method": "GET",
+      "path": "/v2/purchase_orders/{purchase_order_id}/documents/received_summary",
+      "params": [
+        {
+          "name": "purchase_order_id",
+          "type": "string",
+          "location": "path",
+          "description": "The purchase order identifier",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "purchase-orders_documents_get-purchase-order-summary-pdf",
+      "description": "Download a PDF document containing the purchase order summary. Available for purchase orders with status: open, receiving, received, or closed. Required: purchase_order_id.",
+      "method": "GET",
+      "path": "/v2/purchase_orders/{purchase_order_id}/documents/order_summary",
+      "params": [
+        {
+          "name": "purchase_order_id",
+          "type": "string",
+          "location": "path",
+          "description": "The purchase order identifier",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "purchase-orders_receives_purchase-order-products",
+      "description": "Record receipt of products from a purchase order. This updates inventory levels and may automatically change purchase order status. Required: purchase_order_id, product_receives. Returns the new ReceivesPurchaseOrderProductsResponse.",
+      "method": "POST",
+      "path": "/v2/purchase_orders/{purchase_order_id}/receives",
+      "params": [
+        {
+          "name": "purchase_order_id",
+          "type": "string",
+          "location": "path",
+          "description": "The purchase order identifier",
+          "required": true
+        },
+        {
+          "name": "product_receives",
+          "type": "array",
+          "location": "body",
+          "description": "List of products being received",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "purchase-orders_shipping-details_update-purchase-order",
+      "description": "Update shipping-related details for a purchase order in `open` status. Editing limitations: - Once a purchase order moves to any higher status (receiving, received, cancelled, or closed), updating shipping details is no longer allowed. - Only the following fields can be modified: shipping_carrier, payment_terms, payment_status, order_date, expected_delivery_date, note_to_supplier, tracking_number, currency_code, and reference_number. Required: purchase_order_id. Optional: currency_code, expected_delivery_date, note_to_supplier (plus 6 more). Returns the new ShippingDetailsUpdatePurchaseOrderResponse.",
+      "method": "POST",
+      "path": "/v2/purchase_orders/{purchase_order_id}/shipping_details",
+      "params": [
+        {
+          "name": "purchase_order_id",
+          "type": "string",
+          "location": "path",
+          "description": "The purchase order identifier",
+          "required": true
+        },
+        {
+          "name": "currency_code",
+          "type": "string",
+          "location": "body",
+          "description": "Currency code"
+        },
+        {
+          "name": "expected_delivery_date",
+          "type": "string",
+          "location": "body",
+          "description": "Expected delivery date"
+        },
+        {
+          "name": "note_to_supplier",
+          "type": "string",
+          "location": "body",
+          "description": "Note to supplier"
+        },
+        {
+          "name": "order_date",
+          "type": "string",
+          "location": "body",
+          "description": "Order date"
+        },
+        {
+          "name": "payment_status",
+          "type": "string",
+          "location": "body",
+          "description": "Payment status"
+        },
+        {
+          "name": "payment_terms",
+          "type": "string",
+          "location": "body",
+          "description": "Payment terms"
+        },
+        {
+          "name": "reference_number",
+          "type": "string",
+          "location": "body",
+          "description": "Reference number"
+        },
+        {
+          "name": "shipping_carrier",
+          "type": "string",
+          "location": "body",
+          "description": "Shipping carrier"
+        },
+        {
+          "name": "tracking_number",
+          "type": "string",
+          "location": "body",
+          "description": "Tracking number"
+        }
+      ]
+    },
+    {
+      "name": "purchase-orders_status_update-purchase-order",
+      "description": "Update the status of a purchase order. Valid status transitions must be followed. Required: purchase_order_id, status. Returns the new StatusUpdatePurchaseOrderResponse.",
+      "method": "POST",
+      "path": "/v2/purchase_orders/{purchase_order_id}/status",
+      "params": [
+        {
+          "name": "purchase_order_id",
+          "type": "string",
+          "location": "path",
+          "description": "The purchase order identifier",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "location": "body",
+          "description": "New status for the purchase order",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "rates_calculate",
+      "description": "It's not uncommon that you want to give your customer the choice between whether they want to ship the fastest, cheapest, or the most trusted route. Most companies don't solely ship things using a single shipping option; so we provide functionality to show you all your options! Returns the new CalculateRatesResponseBody.",
+      "method": "POST",
+      "path": "/v2/rates",
+      "params": []
+    },
+    {
+      "name": "rates_estimate",
+      "description": "Get Rate Estimates. Returns array of RatesEstimateItem.",
+      "method": "POST",
+      "path": "/v2/rates/estimate",
+      "params": []
+    },
+    {
+      "name": "rates_get-by-id",
+      "description": "Retrieve a previously queried rate by its ID. Required: rate_id. Returns the GetRateByIdResponseBody.",
+      "method": "GET",
+      "path": "/v2/rates/{rate_id}",
+      "params": [
+        {
+          "name": "rate_id",
+          "type": "string",
+          "location": "path",
+          "description": "Rate ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "shipments_assign-user-to",
+      "description": "Assigns a user to one or more shipments. You can assign a single user to up to 500 shipments at once. Required: shipment_ids, user_id. Returns the new AssignUserResponseBody.",
+      "method": "POST",
+      "path": "/v2/shipments/user",
+      "params": [
+        {
+          "name": "shipment_ids",
+          "type": "array",
+          "location": "body",
+          "description": "Array of shipment IDs to assign the user to",
+          "required": true
+        },
+        {
+          "name": "user_id",
+          "type": "string",
+          "location": "body",
+          "description": "The ID of the user to assign to the shipments",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "shipments_create",
+      "description": "Create one or more shipments. Required: shipments. Returns the new CreateShipmentsResponseBody.",
+      "method": "POST",
+      "path": "/v2/shipments",
+      "params": [
+        {
+          "name": "shipments",
+          "type": "array",
+          "location": "body",
+          "description": "Array of shipments to create",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "shipments_get-by-external-id",
+      "description": "Query Shipments created using your own custom ID convention using this endpoint. Required: external_shipment_id. Returns the GetShipmentByExternalIdResponseBody.",
+      "method": "GET",
+      "path": "/v2/shipments/external_shipment_id/{external_shipment_id}",
+      "params": [
+        {
+          "name": "external_shipment_id",
+          "type": "string",
+          "location": "path",
+          "description": "External shipment id",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "shipments_get-by-id",
+      "description": "Get an individual shipment based on its ID. Required: shipment_id. Returns the GetShipmentByIdResponseBody.",
+      "method": "GET",
+      "path": "/v2/shipments/{shipment_id}",
+      "params": [
+        {
+          "name": "shipment_id",
+          "type": "string",
+          "location": "path",
+          "description": "Shipment ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "shipments_list",
+      "description": "Get list of Shipments. Required: pickup_id. Optional: shipment_status, batch_id, created_at_start (plus 15 more). Returns the ListShipmentsResponseBody.",
+      "method": "GET",
+      "path": "/v2/shipments",
+      "params": [
+        {
+          "name": "shipment_status",
+          "type": "string",
+          "location": "query",
+          "description": "Shipment status"
+        },
+        {
+          "name": "batch_id",
+          "type": "string",
+          "location": "query",
+          "description": "Batch ID"
+        },
+        {
+          "name": "pickup_id",
+          "type": "string",
+          "location": "query",
+          "description": "Pickup id",
+          "required": true
+        },
+        {
+          "name": "created_at_start",
+          "type": "string",
+          "location": "query",
+          "description": "Used to create a filter for when a resource was created (ex."
+        },
+        {
+          "name": "created_at_end",
+          "type": "string",
+          "location": "query",
+          "description": "Used to create a filter for when a resource was created, (ex."
+        },
+        {
+          "name": "modified_at_start",
+          "type": "string",
+          "location": "query",
+          "description": "Used to create a filter for when a resource was modified (ex. A shipment that was modified after a certain time)"
+        },
+        {
+          "name": "modified_at_end",
+          "type": "string",
+          "location": "query",
+          "description": "Used to create a filter for when a resource was modified (ex. A shipment that was modified before a certain time)"
+        },
+        {
+          "name": "page",
+          "type": "int",
+          "location": "query",
+          "description": "Return a specific page of results."
+        },
+        {
+          "name": "page_size",
+          "type": "int",
+          "location": "query",
+          "description": "The number of results to return per response."
+        },
+        {
+          "name": "sales_order_id",
+          "type": "string",
+          "location": "query",
+          "description": "Sales Order ID"
+        },
+        {
+          "name": "sort_dir",
+          "type": "string",
+          "location": "query",
+          "description": "Controls the sort order of the query."
+        },
+        {
+          "name": "shipment_number",
+          "type": "string",
+          "location": "query",
+          "description": "The user or order source defined shipment number"
+        },
+        {
+          "name": "ship_to_name",
+          "type": "string",
+          "location": "query",
+          "description": "The name associated with the ship_to"
+        },
+        {
+          "name": "item_keyword",
+          "type": "string",
+          "location": "query",
+          "description": "Returns shipments that contain items that match the specified keyword. Fields searched are Sku, Description, and Options."
+        },
+        {
+          "name": "payment_date_start",
+          "type": "string",
+          "location": "query",
+          "description": "Used to create a filter for resources based on the payment_date parameter after a certain time."
+        },
+        {
+          "name": "payment_date_end",
+          "type": "string",
+          "location": "query",
+          "description": "Used to create a filter for resources based on the payment_date parameter before a certain time."
+        },
+        {
+          "name": "store_id",
+          "type": "string",
+          "location": "query",
+          "description": "Store ID"
+        },
+        {
+          "name": "external_shipment_id",
+          "type": "string",
+          "location": "query",
+          "description": "Filter labels by external shipment ID."
+        },
+        {
+          "name": "sort_by",
+          "type": "string",
+          "location": "query",
+          "description": "Sort by"
+        }
+      ]
+    },
+    {
+      "name": "shipments_update",
+      "description": "Update an existing shipment's details including addresses, package information, carrier service, and shipping options. Use this endpoint to modify shipment information before purchasing a label. Note: The following fields are read-only and cannot be updated: shipment_id, created_at, modified_at, shipment_status, tags, and total_weight. Required: shipment_id. Optional: advanced_options, amount_paid, assigned_user (plus 41 more). Returns the updated Shipment.",
+      "method": "PUT",
+      "path": "/v2/shipments/{shipment_id}",
+      "params": [
+        {
+          "name": "shipment_id",
+          "type": "string",
+          "location": "path",
+          "description": "Shipment ID",
+          "required": true
+        },
+        {
+          "name": "advanced_options",
+          "type": "object",
+          "location": "body",
+          "description": "Advanced shipment options. These are entirely optional."
+        },
+        {
+          "name": "amount_paid",
+          "type": "object",
+          "location": "body",
+          "description": "Total amount paid for the order"
+        },
+        {
+          "name": "assigned_user",
+          "type": "string",
+          "location": "body",
+          "description": "User assigned to the shipment"
+        },
+        {
+          "name": "carrier_id",
+          "type": "string",
+          "location": "body",
+          "description": "The carrier account that is billed for the shipping charges"
+        },
+        {
+          "name": "comparison_rate_type",
+          "type": "string",
+          "location": "body",
+          "description": "Calculate a rate for this shipment with the requested carrier using a ratecard that differs from the default. Only supported for UPS and USPS."
+        },
+        {
+          "name": "confirmation",
+          "type": "string",
+          "location": "body",
+          "description": "The type of delivery confirmation that is required for this shipment"
+        },
+        {
+          "name": "created_at",
+          "type": "string",
+          "location": "body",
+          "description": "The date and time that the shipment was created in ShipStation ."
+        },
+        {
+          "name": "customs",
+          "type": "object",
+          "location": "body",
+          "description": "Customs information. This is usually only needed for international shipments."
+        },
+        {
+          "name": "deliver_by_date",
+          "type": "string",
+          "location": "body",
+          "description": "Date by which the shipment should be delivered"
+        },
+        {
+          "name": "display_scheme",
+          "type": "string",
+          "location": "body",
+          "description": "Display scheme for the shipment"
+        },
+        {
+          "name": "external_order_id",
+          "type": "string",
+          "location": "body",
+          "description": "ID that the Order Source assigned"
+        },
+        {
+          "name": "external_shipment_id",
+          "type": "string",
+          "location": "body",
+          "description": "A unique user-defined key to identify a shipment. This can be used to retrieve the shipment. \u003e **Warning:** The `external_shipment_id` is limited to 50 characters. Any additional characters will be truncated."
+        },
+        {
+          "name": "hold_until_date",
+          "type": "string",
+          "location": "body",
+          "description": "Date to hold the shipment until"
+        },
+        {
+          "name": "insurance_provider",
+          "type": "string",
+          "location": "body",
+          "description": "The insurance provider to use for any insured packages in the shipment."
+        },
+        {
+          "name": "internal_notes",
+          "type": "string",
+          "location": "body",
+          "description": "Internal notes from the seller"
+        },
+        {
+          "name": "is_gift",
+          "type": "bool",
+          "location": "body",
+          "description": "Indicates if the shipment is a gift"
+        },
+        {
+          "name": "is_return",
+          "type": "bool",
+          "location": "body",
+          "description": "An optional indicator if the shipment is intended to be a return. Defaults to false if not provided."
+        },
+        {
+          "name": "items",
+          "type": "array",
+          "location": "body",
+          "description": "Describe the packages included in this shipment as related to potential metadata that was imported from external order sources"
+        },
+        {
+          "name": "modified_at",
+          "type": "string",
+          "location": "body",
+          "description": "The date and time that the shipment was created or last modified."
+        },
+        {
+          "name": "notes_for_gift",
+          "type": "string",
+          "location": "body",
+          "description": "Gift notes"
+        },
+        {
+          "name": "notes_from_buyer",
+          "type": "string",
+          "location": "body",
+          "description": "Notes from the buyer"
+        },
+        {
+          "name": "notes_to_buyer",
+          "type": "string",
+          "location": "body",
+          "description": "Notes to the buyer"
+        },
+        {
+          "name": "order_source_code",
+          "type": "string",
+          "location": "body",
+          "description": "The order sources that are supported by ShipStation"
+        },
+        {
+          "name": "packages",
+          "type": "array",
+          "location": "body",
+          "description": "The packages in the shipment. \u003e **Note:** Some carriers only allow one package per shipment. If you attempt to create a multi-package shipment for a carrier that doesn't allow it, an error will be returned."
+        },
+        {
+          "name": "requested_shipment_service",
+          "type": "string",
+          "location": "body",
+          "description": "The requested shipment service"
+        },
+        {
+          "name": "retail_rate",
+          "type": "object",
+          "location": "body",
+          "description": "The retail rate for the shipment"
+        },
+        {
+          "name": "return_to",
+          "type": "object",
+          "location": "body",
+          "description": "The return address for this shipment. Defaults to the `ship_from` address. Can be sent with a warehouse_id, in which case the return address can be overridden. This allows you to have a different address printed on the label while maintaining the origin address."
+        },
+        {
+          "name": "service_code",
+          "type": "string",
+          "location": "body",
+          "description": "The [carrier service] used to ship the package, such as `fedex_ground`, `usps_first_class_mail`, `flat_rate_envelope`, etc."
+        },
+        {
+          "name": "ship_by_date",
+          "type": "string",
+          "location": "body",
+          "description": "Date by which the shipment should be shipped"
+        },
+        {
+          "name": "ship_date",
+          "type": "string",
+          "location": "body",
+          "description": "The date that the shipment was (or will be) shippped. ShipStation will take the day of week into consideration. For example, if the carrier does not operate on Sundays, then a package that would have shipped on Sunday will ship on Monday instead."
+        },
+        {
+          "name": "ship_from",
+          "type": "object",
+          "location": "body",
+          "description": "The shipment's origin address. If you frequently ship from the same location, consider [creating a warehouse]. Then you can simply specify the `warehouse_id` rather than the complete address each time."
+        },
+        {
+          "name": "ship_to",
+          "type": "object",
+          "location": "body",
+          "description": "The recipient's mailing address"
+        },
+        {
+          "name": "shipment_number",
+          "type": "string",
+          "location": "body",
+          "description": "A non-unique user-defined number used to identify a shipment. If undefined, this will match the external_shipment_id of the shipment. \u003e **Warning:** The `shipment_number` is limited to 50 characters. Any additional characters will be truncated."
+        },
+        {
+          "name": "shipment_status",
+          "type": "string",
+          "location": "body",
+          "description": "The current status of the shipment"
+        },
+        {
+          "name": "shipping_paid",
+          "type": "object",
+          "location": "body",
+          "description": "Amount paid for shipping"
+        },
+        {
+          "name": "shipping_rule_id",
+          "type": "string",
+          "location": "body",
+          "description": "ID of the shipping rule, which you want to use to automate carrier/carrier service selection for the shipment"
+        },
+        {
+          "name": "store_id",
+          "type": "string",
+          "location": "body",
+          "description": "The store ID associated with the shipment"
+        },
+        {
+          "name": "tags",
+          "type": "array",
+          "location": "body",
+          "description": "Arbitrary tags associated with this shipment. Tags can be used to categorize shipments, and shipments can be queried by their tags. Note: Tags require object structure with name property, not simple strings."
+        },
+        {
+          "name": "tax_identifiers",
+          "type": "array",
+          "location": "body",
+          "description": "Tax identifiers"
+        },
+        {
+          "name": "tax_paid",
+          "type": "object",
+          "location": "body",
+          "description": "Amount paid for taxes"
+        },
+        {
+          "name": "total_weight",
+          "type": "object",
+          "location": "body",
+          "description": "The combined weight of all packages in the shipment"
+        },
+        {
+          "name": "validate_address",
+          "type": "string",
+          "location": "body",
+          "description": "Address validation option for ship_to and ship_from addresses"
+        },
+        {
+          "name": "warehouse_id",
+          "type": "string",
+          "location": "body",
+          "description": "The [warehouse] that the shipment is being shipped from. Either `warehouse_id` or `ship_from` must be specified."
+        },
+        {
+          "name": "zone",
+          "type": "int",
+          "location": "body",
+          "description": "Shipping zone"
+        }
+      ]
+    },
+    {
+      "name": "shipments_cancel_shipments",
+      "description": "Mark a shipment cancelled, if it is no longer needed or being used by your organized. Any label associated with the shipment needs to be voided first An example use case would be if a batch label creation job is going to run at a set time and only queries `pending` shipments. Marking a shipment as cancelled would remove it from this process. Required: shipment_id.",
+      "method": "PUT",
+      "path": "/v2/shipments/{shipment_id}/cancel",
+      "params": [
+        {
+          "name": "shipment_id",
+          "type": "string",
+          "location": "path",
+          "description": "Shipment ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "shipments_internal-notes_update-shipment",
+      "description": "Update the internal notes on a shipment. You can either overwrite the existing notes entirely or append new text to the current notes. | Mode | `note` value | Result | |------|-------------|--------| | `overwrite` | `'new note'` | Replaces existing notes | | `overwrite` | `''` or `' '` | Clears the note | | `append` | `'new note'` | Appends text to existing notes |. Required: shipment_id, mode, note. Returns the new InternalNotesUpdateShipmentResponse.",
+      "method": "POST",
+      "path": "/v2/shipments/{shipment_id}/internal_notes",
+      "params": [
+        {
+          "name": "shipment_id",
+          "type": "string",
+          "location": "path",
+          "description": "Shipment ID",
+          "required": true
+        },
+        {
+          "name": "mode",
+          "type": "string",
+          "location": "body",
+          "description": "Controls how the note is applied. - `append` adds the text to the end of any existing notes. - `overwrite` replaces the existing notes entirely (use an empty string to clear).",
+          "required": true
+        },
+        {
+          "name": "note",
+          "type": "string",
+          "location": "body",
+          "description": "The note text to set or append.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "shipments_rates_list-shipment",
+      "description": "Get Rates for the shipment information associated with the shipment ID. Required: shipment_id. Optional: created_at_start. Returns the ListShipmentRatesResponseBody.",
+      "method": "GET",
+      "path": "/v2/shipments/{shipment_id}/rates",
+      "params": [
+        {
+          "name": "shipment_id",
+          "type": "string",
+          "location": "path",
+          "description": "Shipment ID",
+          "required": true
+        },
+        {
+          "name": "created_at_start",
+          "type": "string",
+          "location": "query",
+          "description": "Used to create a filter for when a resource was created (ex."
+        }
+      ]
+    },
+    {
+      "name": "shipments_tags_shipment",
+      "description": "Add a tag to the shipment object. Required: shipment_id, tag_name. Returns the new TagShipmentResponseBody.",
+      "method": "POST",
+      "path": "/v2/shipments/{shipment_id}/tags/{tag_name}",
+      "params": [
+        {
+          "name": "shipment_id",
+          "type": "string",
+          "location": "path",
+          "description": "Shipment ID",
+          "required": true
+        },
+        {
+          "name": "tag_name",
+          "type": "string",
+          "location": "path",
+          "description": "Tag name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "shipments_tags_untag-shipment",
+      "description": "Remove an existing tag from the Shipment object. Required: shipment_id, tag_name. Destructive.",
+      "method": "DELETE",
+      "path": "/v2/shipments/{shipment_id}/tags/{tag_name}",
+      "params": [
+        {
+          "name": "shipment_id",
+          "type": "string",
+          "location": "path",
+          "description": "Shipment ID",
+          "required": true
+        },
+        {
+          "name": "tag_name",
+          "type": "string",
+          "location": "path",
+          "description": "Tag name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "suppliers_create",
+      "description": "Create a new supplier with contact and address information. Required: supplier_name. Optional: address_line_1, address_line_2, city (plus 6 more). Returns the new SuppliersCreateResponse.",
+      "method": "POST",
+      "path": "/v2/suppliers",
+      "params": [
+        {
+          "name": "address_line_1",
+          "type": "string",
+          "location": "body",
+          "description": "First line of address"
+        },
+        {
+          "name": "address_line_2",
+          "type": "string",
+          "location": "body",
+          "description": "Second line of address"
+        },
+        {
+          "name": "city",
+          "type": "string",
+          "location": "body",
+          "description": "City"
+        },
+        {
+          "name": "contact_name",
+          "type": "string",
+          "location": "body",
+          "description": "Contact person name"
+        },
+        {
+          "name": "contact_phone",
+          "type": "string",
+          "location": "body",
+          "description": "Contact phone number"
+        },
+        {
+          "name": "country_code",
+          "type": "string",
+          "location": "body",
+          "description": "ISO 3166-1 alpha-2 country code"
+        },
+        {
+          "name": "postal_code",
+          "type": "string",
+          "location": "body",
+          "description": "Postal or ZIP code"
+        },
+        {
+          "name": "state",
+          "type": "string",
+          "location": "body",
+          "description": "State or province"
+        },
+        {
+          "name": "supplier_email",
+          "type": "string",
+          "location": "body",
+          "description": "Email address of the supplier"
+        },
+        {
+          "name": "supplier_name",
+          "type": "string",
+          "location": "body",
+          "description": "Name of the supplier",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "suppliers_get",
+      "description": "Retrieve detailed information about a specific supplier. Required: supplier_id. Returns the SuppliersGetResponse.",
+      "method": "GET",
+      "path": "/v2/suppliers/{supplier_id}",
+      "params": [
+        {
+          "name": "supplier_id",
+          "type": "string",
+          "location": "path",
+          "description": "The supplier identifier",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "suppliers_list",
+      "description": "Retrieve a paginated list of all suppliers with optional filtering by supplier name. Optional: supplier_name, page_size (default: 50). Returns the SuppliersListResponse.",
+      "method": "GET",
+      "path": "/v2/suppliers",
+      "params": [
+        {
+          "name": "supplier_name",
+          "type": "string",
+          "location": "query",
+          "description": "Filter by supplier name (partial match)"
+        },
+        {
+          "name": "page_size",
+          "type": "int",
+          "location": "query",
+          "description": "Number of results per page"
+        }
+      ]
+    },
+    {
+      "name": "suppliers_update",
+      "description": "Update an existing supplier's information. Required: supplier_id, supplier_name. Optional: address_line_1, address_line_2, city (plus 6 more). Returns the updated SuppliersUpdateResponse.",
+      "method": "PUT",
+      "path": "/v2/suppliers/{supplier_id}",
+      "params": [
+        {
+          "name": "supplier_id",
+          "type": "string",
+          "location": "path",
+          "description": "The supplier identifier",
+          "required": true
+        },
+        {
+          "name": "address_line_1",
+          "type": "string",
+          "location": "body",
+          "description": "Address line 1"
+        },
+        {
+          "name": "address_line_2",
+          "type": "string",
+          "location": "body",
+          "description": "Address line 2"
+        },
+        {
+          "name": "city",
+          "type": "string",
+          "location": "body",
+          "description": "City"
+        },
+        {
+          "name": "contact_name",
+          "type": "string",
+          "location": "body",
+          "description": "Contact name"
+        },
+        {
+          "name": "contact_phone",
+          "type": "string",
+          "location": "body",
+          "description": "Contact phone"
+        },
+        {
+          "name": "country_code",
+          "type": "string",
+          "location": "body",
+          "description": "Country code"
+        },
+        {
+          "name": "postal_code",
+          "type": "string",
+          "location": "body",
+          "description": "Postal code"
+        },
+        {
+          "name": "state",
+          "type": "string",
+          "location": "body",
+          "description": "State"
+        },
+        {
+          "name": "supplier_email",
+          "type": "string",
+          "location": "body",
+          "description": "Supplier email"
+        },
+        {
+          "name": "supplier_name",
+          "type": "string",
+          "location": "body",
+          "description": "Supplier name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "tags_create",
+      "description": "Create a new Tag for customizing how you track your shipments. Required: tag_name. Returns the new CreateTagResponseBody.",
+      "method": "POST",
+      "path": "/v2/tags/{tag_name}",
+      "params": [
+        {
+          "name": "tag_name",
+          "type": "string",
+          "location": "path",
+          "description": "Tag name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "tags_list",
+      "description": "Get a list of all tags associated with an account. Returns the ListTagsResponseBody.",
+      "method": "GET",
+      "path": "/v2/tags",
+      "params": []
+    },
+    {
+      "name": "totes_create-batch",
+      "description": "Create multiple totes at once. Returns both successfully created totes and any failures. Required: totes. Optional: return_succeeded_totes (default: false).",
+      "method": "POST",
+      "path": "/v2/totes",
+      "params": [
+        {
+          "name": "return_succeeded_totes",
+          "type": "bool",
+          "location": "body",
+          "description": "Whether to include successfully created totes in the response. When false, only failed_totes will be returned."
+        },
+        {
+          "name": "totes",
+          "type": "array",
+          "location": "body",
+          "description": "Array of totes to create",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "totes_delete",
+      "description": "Delete a tote by its ID. Required: tote_id. Destructive.",
+      "method": "DELETE",
+      "path": "/v2/totes/{tote_id}",
+      "params": [
+        {
+          "name": "tote_id",
+          "type": "string",
+          "location": "path",
+          "description": "Tote ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "totes_get-by-id",
+      "description": "Retrieve details of a specific tote. Required: tote_id. Returns the Tote.",
+      "method": "GET",
+      "path": "/v2/totes/{tote_id}",
+      "params": [
+        {
+          "name": "tote_id",
+          "type": "string",
+          "location": "path",
+          "description": "Tote ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "totes_get-quantities",
+      "description": "Get the number of totes in each warehouse. Returns the TotesGetQuantitiesResponse.",
+      "method": "GET",
+      "path": "/v2/totes/quantities",
+      "params": []
+    },
+    {
+      "name": "totes_list",
+      "description": "Get all totes for the seller, optionally filtered by warehouse. Optional: inventory_warehouse_id. Returns the TotesListResponse.",
+      "method": "GET",
+      "path": "/v2/totes",
+      "params": [
+        {
+          "name": "inventory_warehouse_id",
+          "type": "string",
+          "location": "query",
+          "description": "Inventory Warehouse ID to filter totes"
+        }
+      ]
+    },
+    {
+      "name": "totes_update",
+      "description": "Update the name or barcode of an existing tote. Required: tote_id, inventory_warehouse_id, tote_name. Optional: tote_barcode.",
+      "method": "PUT",
+      "path": "/v2/totes/{tote_id}",
+      "params": [
+        {
+          "name": "tote_id",
+          "type": "string",
+          "location": "path",
+          "description": "Tote ID",
+          "required": true
+        },
+        {
+          "name": "inventory_warehouse_id",
+          "type": "string",
+          "location": "body",
+          "description": "The warehouse where this tote is located",
+          "required": true
+        },
+        {
+          "name": "tote_barcode",
+          "type": "string",
+          "location": "body",
+          "description": "Updated barcode for the tote"
+        },
+        {
+          "name": "tote_name",
+          "type": "string",
+          "location": "body",
+          "description": "Updated name for the tote",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "tracking_stop",
+      "description": "Unsubscribe from tracking updates for a package. Optional: carrier_code, tracking_number.",
+      "method": "POST",
+      "path": "/v2/tracking/stop",
+      "params": [
+        {
+          "name": "carrier_code",
+          "type": "string",
+          "location": "query",
+          "description": "A [shipping carrier] , such as `fedex`, `dhl_express`, `stamps_com`, etc."
+        },
+        {
+          "name": "tracking_number",
+          "type": "string",
+          "location": "query",
+          "description": "The tracking number associated with a shipment"
+        }
+      ]
+    },
+    {
+      "name": "users_list",
+      "description": "List users. Optional: status, page_size (default: 25), page (default: 1). Returns the UsersListResponse.",
+      "method": "GET",
+      "path": "/v2/users",
+      "params": [
+        {
+          "name": "status",
+          "type": "string",
+          "location": "query",
+          "description": "Filter users by their status"
+        },
+        {
+          "name": "page_size",
+          "type": "int",
+          "location": "query",
+          "description": "The number of results to return per page"
+        },
+        {
+          "name": "page",
+          "type": "int",
+          "location": "query",
+          "description": "The page number to return"
+        }
+      ]
+    },
+    {
+      "name": "warehouses_get-by-id",
+      "description": "Retrieve warehouse data based on the warehouse ID. Required: warehouse_id. Returns the GetWarehouseByIdResponseBody.",
+      "method": "GET",
+      "path": "/v2/warehouses/{warehouse_id}",
+      "params": [
+        {
+          "name": "warehouse_id",
+          "type": "string",
+          "location": "path",
+          "description": "Warehouse ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "warehouses_list",
+      "description": "Retrieve a list of warehouses associated with this account. Returns the ListWarehousesResponseBody.",
+      "method": "GET",
+      "path": "/v2/warehouses",
+      "params": []
+    }
+  ]
+}
