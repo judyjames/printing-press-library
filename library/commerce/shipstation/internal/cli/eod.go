@@ -116,10 +116,18 @@ func computeBurndown(db *store.Store, date, warehouse string) (eodResult, error)
 		  AND id NOT IN (
 		    SELECT json_extract(data, '$.shipment_id')
 		    FROM resources
+	q := `
+		SELECT id, data
+		FROM resources
+		WHERE resource_type = 'shipments'
+		  AND date(json_extract(data, '$.created_at')) = date(?)
+		  AND id NOT IN (
+		    SELECT json_extract(data, '$.shipment_id')
+		    FROM resources
 		    WHERE resource_type = 'labels'
-		      AND date(json_extract(data, '$.created_at')) = date(?)
 		      AND json_extract(data, '$.shipment_id') IS NOT NULL
 		  )`
+	rows, err := db.DB().Query(q, date)
 	rows, err := db.DB().Query(q, date, date)
 	if err != nil {
 		return eodResult{}, err
